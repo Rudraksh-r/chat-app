@@ -22,4 +22,15 @@ const userSchema = new Schema(
             type: String,
             default: ""
         }
-    }, { timestamps: true }) 
+    }, { timestamps: true });
+
+userSchema.pre("save", async function () {
+    if (!this.isModified("password")) return;
+    this.password = await bcrypt.hash(this.password, 10);
+})
+
+userSchema.methods.isPasswordCorrect = async function name(password) {
+    return await bcrypt.compare(password, this.password);
+};
+
+export const User = mongoose.model("User", userSchema);
