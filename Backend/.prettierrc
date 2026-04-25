@@ -2,7 +2,7 @@
     "singleQuote": false,
     "bracetSpacing": true,
     "tabWidth": 2,
-    "trailingComma": "es5",
+    "trailingComma": "all",
     "semi": true
 
 }
