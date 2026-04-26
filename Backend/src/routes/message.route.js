@@ -4,7 +4,7 @@ import { verifyJWT } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.post("/", verifyJWT, sendMessage)
-router.get("/", verifyJWT, getMessage)
+router.post("/send", verifyJWT, sendMessage)
+router.get("/:convoId", verifyJWT, getMessage)
 
 export default router

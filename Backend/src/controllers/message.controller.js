@@ -2,10 +2,20 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { Message } from "../models/message.model.js";
 import { Conversation } from "../models/conversation.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiError } from "../utils/ApiError.js";
 
 const sendMessage = asyncHandler(async (req, res) => {
     const { convoId, text } = req.body;
     const senderId = req.user._id;
+
+    if (!convoId || !text) {
+        throw new ApiError(400, "convoId and text are required")
+    }
+
+    const convoExists = await Conversation.findById(convoId)
+    if (!convoExists) {
+        throw new ApiError(404, "Conversation not found")
+    }
 
     const message = await Message.create({ convoId, senderId, text })
 
