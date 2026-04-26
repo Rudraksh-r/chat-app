@@ -20,7 +20,8 @@ const sendMessage = asyncHandler(async (req, res) => {
     const message = await Message.create({ convoId, senderId, text })
 
     await Conversation.findByIdAndUpdate(convoId, { lastMessage: text })
-    res.status(201).json(new ApiResponse(201, message, "Message sent successfully"))
+    return res.status(201)
+        .json(new ApiResponse(201, message, "Message sent successfully"))
 })
 
 const getMessage = asyncHandler(async (req, res) => {

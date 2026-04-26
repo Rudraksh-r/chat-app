@@ -37,6 +37,10 @@ const registerUser = asyncHandler(async (req, res) => {
         password,
     })
 
+    const createdUser = await User.findById(user._id).select(
+        "-password -refreshToken"
+    )
+
     const accessToken = generateAccessToken(user._id)
     const refreshToken = generateRefreshToken(user._id)
 
@@ -44,7 +48,7 @@ const registerUser = asyncHandler(async (req, res) => {
         .status(201)
         .json(
             new ApiResponse(201, {
-                user,
+                createdUser,
                 accessToken,
                 refreshToken
             }, "User registered successfully")
@@ -59,6 +63,10 @@ const login = asyncHandler(async (req, res) => {
     }
 
     const user = await User.findOne({ email })
+
+    const loggedInUser = await User.findById(user._id).select(
+        "-password -refreshToken"
+    )
 
     if (!user) {
         throw new ApiError(404, "Invalid credentials")
@@ -78,7 +86,7 @@ const login = asyncHandler(async (req, res) => {
         .status(200)
         .json(
             new ApiResponse(200, {
-                user,
+                loggedInUser,
                 accessToken,
                 refreshToken
             }, "User logged in successfully")
