@@ -3,6 +3,7 @@ import { Message } from "../models/message.model.js";
 import { Conversation } from "../models/conversation.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
+import { getReceiverSocketId, io } from "../socket/socket.js";
 
 const sendMessage = asyncHandler(async (req, res) => {
     const { convoId, text } = req.body;
@@ -20,6 +21,18 @@ const sendMessage = asyncHandler(async (req, res) => {
     const message = await Message.create({ convoId, senderId, text })
 
     await Conversation.findByIdAndUpdate(convoId, { lastMessage: text })
+
+    // SOCKET.IO REAL-TIME MESSAGING: Emit event to the receiver if online
+    const receiverId = convoExists.members.find((member) => member.toString() !== senderId.toString());
+    
+    if (receiverId) {
+        const receiverSocketId = getReceiverSocketId(receiverId.toString());
+        if (receiverSocketId) {
+            // io.to(<socket_id>).emit() is used to send events to a specific client
+            io.to(receiverSocketId).emit("newMessage", message);
+        }
+    }
+
     return res.status(201)
         .json(new ApiResponse(201, message, "Message sent successfully"))
 })

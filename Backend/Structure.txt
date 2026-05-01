@@ -14,13 +14,13 @@ Phase 7 → Polish
 1.2 → Database connection + models
 1.3 → Auth system (JWT)
 1.4 → Middleware + utils
-1.5 → Chat & Message REST APIs ✅ (we already planned this)
+1.5 → Chat & Message REST APIs✅ (we already planned this)
 🔹 Phase 2 (Real-Time Layer)
-2.1 → Socket server setup
-2.2 → Connection & user mapping
-2.3 → Chat room logic
-2.4 → Message events
-2.5 → Typing indicators
+2.1 → Socket server setup ✅
+2.2 → Connection & user mapping ✅
+2.3 → Chat room logic ✅
+2.4 → Message events ✅
+2.5 → Typing indicators ✅
 🔹 Phase 3 (Frontend Integration)
 3.1 → React setup + structure
 3.2 → Auth UI + state

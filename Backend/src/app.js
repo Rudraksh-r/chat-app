@@ -1,12 +1,12 @@
 import express from "express";
 import cors from "cors"
 import cookieParser from "cookie-parser"
+import { app } from "./socket/socket.js";
 import router from "./routes/auth.routes.js";
 import convoRouter from "./routes/converssation.route.js";
 import messageRouter from "./routes/message.route.js";
 import userRouter from "./routes/user.route.js";
 
-const app = express()
 app.use(cors({
     origin: process.env.CORS_ORIGIN,
     credentials: true
