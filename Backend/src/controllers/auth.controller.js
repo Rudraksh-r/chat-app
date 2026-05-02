@@ -64,14 +64,9 @@ const login = asyncHandler(async (req, res) => {
 
     const user = await User.findOne({ email })
 
-    const loggedInUser = await User.findById(user._id).select(
-        "-password -refreshToken"
-    )
-
     if (!user) {
         throw new ApiError(404, "Invalid credentials")
     }
-
 
     const isPasswordCorrect = await user.isPasswordCorrect(password)
 
@@ -79,11 +74,22 @@ const login = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Invalid credentials")
     }
 
+    const loggedInUser = await User.findById(user._id).select(
+        "-password -refreshToken"
+    )
+
     const accessToken = generateAccessToken(user._id)
     const refreshToken = generateRefreshToken(user._id)
 
+    const options = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production"
+    }
+
     return res
         .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
         .json(
             new ApiResponse(200, {
                 loggedInUser,
