@@ -26,4 +26,26 @@ const searchUsers = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, users, "Users fetched successfully"))
 })
 
-export { searchUsers }
+const updateProfile = asyncHandler(async (req, res) => {
+    const { fullName, username } = req.body;
+
+    if (!fullName && !username) {
+        throw new ApiError(400, "At least one field is required to update")
+    }
+
+    const updateData = {};
+    if (fullName) updateData.fullName = fullName;
+    if (username) updateData.username = username;
+
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: updateData },
+        { new: true }
+    ).select("-password -refreshToken");
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "Profile updated successfully"))
+})
+
+export { searchUsers, updateProfile }

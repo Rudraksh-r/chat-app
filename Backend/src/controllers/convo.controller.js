@@ -18,13 +18,13 @@ const createConvo = asyncHandler(async (req, res) => {
 
     let conversation = await Conversation.findOne({
         members: { $all: [senderId, receiverId] }
-    }).populate("members", "fullName username email avatar")
+    }).populate("members", "fullName username email avatar lastSeen")
 
     if (!conversation) {
         conversation = await Conversation.create({
             members: [senderId, receiverId]
         })
-        conversation = await conversation.populate("members", "fullName username email avatar")
+        conversation = await conversation.populate("members", "fullName username email avatar lastSeen")
     }
 
     return res
@@ -38,7 +38,7 @@ const getAllConvo = asyncHandler( async (req, res) => {
     const conversations = await Conversation.find({
         members: req.user._id
     })
-    .populate("members", "fullName username email avatar")
+    .populate("members", "fullName username email avatar lastSeen")
     .sort({updatedAt: -1})
     // what does .sort({updatedAt: -1}) do?
 

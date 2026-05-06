@@ -35,7 +35,9 @@ export const Input = React.forwardRef(({ className, type, icon: Icon, ...props }
     <div className="relative">
       {Icon && (
         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-          <Icon size={18} />
+          {typeof Icon === 'function' || (typeof Icon === 'object' && Icon.$$typeof) ? (
+            React.isValidElement(Icon) ? Icon : <Icon size={18} />
+          ) : Icon}
         </div>
       )}
       <input

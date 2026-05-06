@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Plus, Settings, MoreVertical, 
   Phone, Video, Paperclip, Smile, Send, Check, CheckCheck, Menu, X, LogOut, Loader2
 } from "lucide-react";
-import { formatTime, cn } from "../lib/utils";
+import { formatTime, formatTimeAgo, cn } from "../lib/utils";
 import { Button, Avatar } from "../components/ui/index";
 import useAuthStore from "../store/authStore";
 import useChatStore from "../store/chatStore";
@@ -19,7 +20,7 @@ export function ChatLayout() {
     getConversations, setActiveConversation, sendMessage,
     searchUsers, createConversation,
   } = useChatStore();
-  const { emitTyping, emitStopTyping } = useSocketStore();
+  const { emitTyping, emitStopTyping, emitMessageSeen } = useSocketStore();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [messageText, setMessageText] = useState("");
@@ -28,16 +29,6 @@ export function ChatLayout() {
   const [isSearching, setIsSearching] = useState(false);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-
-  // Fetch conversations on mount
-  useEffect(() => {
-    getConversations();
-  }, [getConversations]);
-
-  // Auto scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   // Get the other user in a 1-on-1 conversation
   const getOtherUser = useCallback((conversation) => {
@@ -49,6 +40,26 @@ export function ChatLayout() {
   const isUserOnline = useCallback((userId) => {
     return onlineUsers.includes(userId);
   }, [onlineUsers]);
+
+  // Fetch conversations on mount
+  useEffect(() => {
+    getConversations();
+  }, [getConversations]);
+
+  // Auto scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Phase 2.5 #3: Emit 'seen' when we open/view a conversation
+  useEffect(() => {
+    if (activeConversation && authUser) {
+      const other = getOtherUser(activeConversation);
+      if (other) {
+        emitMessageSeen(activeConversation._id, other._id);
+      }
+    }
+  }, [activeConversation, authUser, getOtherUser, emitMessageSeen]);
 
   // Handle user search
   useEffect(() => {
@@ -139,6 +150,11 @@ export function ChatLayout() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <Link to="/profile">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-400">
+                <Settings className="w-4 h-4" />
+              </Button>
+            </Link>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-400" onClick={logout}>
               <LogOut className="w-4 h-4" />
             </Button>
@@ -260,7 +276,9 @@ export function ChatLayout() {
                     ) : isOtherOnline ? (
                       <><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" /> Online</>
                     ) : (
-                      "Offline"
+                      <span className="text-slate-500 italic">
+                        {formatTimeAgo(otherUser?.lastSeen)}
+                      </span>
                     )}
                   </p>
                 </div>
@@ -317,8 +335,16 @@ export function ChatLayout() {
                           <div className="flex items-center gap-1 mt-1 px-1">
                             <span className="text-[11px] text-slate-500">{formatTime(msg.createdAt)}</span>
                             {isMe && (
-                              <span className="text-indigo-400">
-                                <Check className="w-3.5 h-3.5" />
+                              <span className={cn(
+                                msg.status === "seen" ? "text-green-400" : "text-indigo-400"
+                              )}>
+                                {msg.status === "seen" ? (
+                                  <CheckCheck className="w-3.5 h-3.5" />
+                                ) : msg.status === "delivered" ? (
+                                  <CheckCheck className="w-3.5 h-3.5" />
+                                ) : (
+                                  <Check className="w-3.5 h-3.5" />
+                                )}
                               </span>
                             )}
                           </div>

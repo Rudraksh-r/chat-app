@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { ChatLayout } from './pages/ChatLayout'
+import { Profile } from './pages/profile'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import useAuthStore from './store/authStore'
@@ -39,6 +40,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<ProtectedRoute><ChatLayout /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

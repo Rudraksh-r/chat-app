@@ -4,17 +4,27 @@ import useChatStore from './chatStore';
 
 const SOCKET_URL = 'http://localhost:5001';
 
+// Phase 2.5 #10: Mirror backend event names on the frontend
+const SOCKET_EVENTS = {
+  USER_ONLINE: "user:online",
+  MESSAGE_RECEIVE: "message:receive",
+  MESSAGE_SEEN: "message:seen",
+  TYPING_START: "typing:start",
+  TYPING_STOP: "typing:stop",
+  ERROR: "socket:error",
+};
+
 const useSocketStore = create((set, get) => ({
   socket: null,
 
   // Connect to Socket.IO server after login
+  // Phase 2.5 #9: No longer passes userId in query — uses cookie auth instead
   connectSocket: (userId) => {
     const { socket } = get();
-    // Don't reconnect if already connected
     if (socket?.connected) return;
 
     const newSocket = io(SOCKET_URL, {
-      query: { userId },
+      withCredentials: true, // Send cookies for JWT auth
     });
 
     newSocket.on('connect', () => {
@@ -22,22 +32,36 @@ const useSocketStore = create((set, get) => ({
     });
 
     // Listen for online users list
-    newSocket.on('getOnlineUsers', (users) => {
+    newSocket.on(SOCKET_EVENTS.USER_ONLINE, (users) => {
       useChatStore.getState().setOnlineUsers(users);
     });
 
     // Listen for incoming messages
-    newSocket.on('newMessage', (message) => {
+    newSocket.on(SOCKET_EVENTS.MESSAGE_RECEIVE, (message) => {
       useChatStore.getState().addIncomingMessage(message);
     });
 
-    // Listen for typing indicators
-    newSocket.on('userTyping', (userId) => {
-      useChatStore.getState().addTypingUser(userId);
+    // Listen for read receipts
+    newSocket.on(SOCKET_EVENTS.MESSAGE_SEEN, ({ convoId, seenBy }) => {
+      useChatStore.getState().markMessagesSeen(convoId, seenBy);
     });
 
-    newSocket.on('userStoppedTyping', (userId) => {
-      useChatStore.getState().removeTypingUser(userId);
+    // Listen for typing indicators
+    newSocket.on(SOCKET_EVENTS.TYPING_START, (typingUserId) => {
+      useChatStore.getState().addTypingUser(typingUserId);
+    });
+
+    newSocket.on(SOCKET_EVENTS.TYPING_STOP, (typingUserId) => {
+      useChatStore.getState().removeTypingUser(typingUserId);
+    });
+
+    // Phase 2.5 #6: Listen for server errors
+    newSocket.on(SOCKET_EVENTS.ERROR, (errorMsg) => {
+      console.error('🔴 Socket error from server:', errorMsg);
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('🔴 Socket connection error:', err.message);
     });
 
     newSocket.on('disconnect', () => {
@@ -59,17 +83,19 @@ const useSocketStore = create((set, get) => ({
   // Emit typing event
   emitTyping: (receiverId) => {
     const { socket } = get();
-    if (socket) {
-      socket.emit('typing', receiverId);
-    }
+    if (socket) socket.emit(SOCKET_EVENTS.TYPING_START, receiverId);
   },
 
   // Emit stop typing event
   emitStopTyping: (receiverId) => {
     const { socket } = get();
-    if (socket) {
-      socket.emit('stopTyping', receiverId);
-    }
+    if (socket) socket.emit(SOCKET_EVENTS.TYPING_STOP, receiverId);
+  },
+
+  // Emit message seen event
+  emitMessageSeen: (convoId, senderId) => {
+    const { socket } = get();
+    if (socket) socket.emit(SOCKET_EVENTS.MESSAGE_SEEN, { convoId, senderId });
   },
 }));
 

@@ -105,6 +105,20 @@ const useChatStore = create((set, get) => ({
     });
   },
 
+  // Phase 2.5 #3: Mark messages as seen in the UI (called from socketStore)
+  markMessagesSeen: (convoId, seenBy) => {
+    const { activeConversation, messages } = get();
+
+    // If we're viewing this conversation, update all messages from the other user
+    if (activeConversation && activeConversation._id === convoId) {
+      set({
+        messages: messages.map(msg =>
+          msg.senderId !== seenBy ? { ...msg, status: "seen" } : msg
+        ),
+      });
+    }
+  },
+
   // Create or get a conversation with a user (used when starting a new chat)
   createConversation: async (receiverId) => {
     try {

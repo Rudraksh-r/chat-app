@@ -4,6 +4,11 @@ import bcrypt from "bcryptjs"
 
 const userSchema = new Schema(
     {
+        fullName: {
+            type: String,
+            required: true,
+            trim: true,
+        },
         username: {
             type: String,
             required: true,
@@ -21,6 +26,10 @@ const userSchema = new Schema(
         avatar: {
             type: String,
             default: ""
+        },
+        lastSeen: {
+            type: Date,
+            default: null
         }
     }, { timestamps: true });
 

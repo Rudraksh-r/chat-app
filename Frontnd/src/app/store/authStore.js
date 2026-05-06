@@ -30,7 +30,7 @@ const useAuthStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const res = await axiosInstance.post('/auth/register', formData);
-      const { createdUser, accessToken } = res.data.data;
+      const { createdUser } = res.data.data;
       set({ authUser: createdUser });
       // Connect socket after signup
       useSocketStore.getState().connectSocket(createdUser._id);
@@ -50,7 +50,7 @@ const useAuthStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const res = await axiosInstance.post('/auth/login', formData);
-      const { loggedInUser, accessToken } = res.data.data;
+      const { loggedInUser } = res.data.data;
       set({ authUser: loggedInUser });
       // Connect socket after login
       useSocketStore.getState().connectSocket(loggedInUser._id);
@@ -75,6 +75,23 @@ const useAuthStore = create((set, get) => ({
       toast.success('Logged out successfully');
     } catch (error) {
       toast.error('Logout failed');
+    }
+  },
+
+  // Update Profile
+  updateProfile: async (data) => {
+    set({ isLoading: true });
+    try {
+      const res = await axiosInstance.put('/user/profile', data);
+      set({ authUser: res.data.data });
+      toast.success('Profile updated successfully');
+      return true;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to update profile';
+      toast.error(message);
+      return false;
+    } finally {
+      set({ isLoading: false });
     }
   },
 }));
