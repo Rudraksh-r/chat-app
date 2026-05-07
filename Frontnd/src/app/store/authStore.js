@@ -9,6 +9,7 @@ const useAuthStore = create((set, get) => ({
   authUser: null,
   isLoading: false,
   isCheckingAuth: true,
+  isUploadingAvatar: false,
 
   // Check if user is already logged in (called on app mount)
   checkAuth: async () => {
@@ -94,6 +95,25 @@ const useAuthStore = create((set, get) => ({
       set({ isLoading: false });
     }
   },
+
+  uploadAvatar: async (file) => {
+    set({ isUploadingAvatar: true });
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const res = await axiosInstance.put('/user/avatar', formData);
+      set({ authUser: res.data.data }) //Explain this res.data.data and it's data flow
+      toast.success("Avatar uploaded successfully!")
+      return true;
+
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to upload avatar"); // Explain error.response?.data?.message
+      return false;
+    } finally {
+      set({ isUploadingAvatar: false });
+    }
+  }
 }));
 
 export default useAuthStore;

@@ -23,9 +23,15 @@ const userSchema = new Schema(
             type: String,
             required: true
         },
-        avatar: {
-            type: String,
-            default: ""
+         avatar: {
+            url: {
+                type: String,
+                default: ""
+            },
+            public_id: {
+                type: String,
+                default: ""
+            }
         },
         lastSeen: {
             type: Date,
