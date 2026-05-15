@@ -96,24 +96,32 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  uploadAvatar: async (file) => {
-    set({ isUploadingAvatar: true });
+  updateAvatar: async (file) => {
+    set({ isLoading: true });
     try {
+      // FormData (capital F — it's a browser built-in constructor)
       const formData = new FormData();
+      // "avatar" must match the field name in upload.single("avatar") on the backend
       formData.append("avatar", file);
 
-      const res = await axiosInstance.put('/user/avatar', formData);
-      set({ authUser: res.data.data }) //Explain this res.data.data and it's data flow
-      toast.success("Avatar uploaded successfully!")
-      return true;
+      // Do NOT set Content-Type manually here.
+      // Axios detects FormData and lets the browser set the correct
+      // multipart/form-data boundary automatically.
+      const res = await axiosInstance.put("/user/avatar", formData);
 
+      // Update the local authUser state so the UI reflects the new avatar immediately
+      set({ authUser: res.data.data });
+      toast.success("Avatar updated successfully!");
+      return true;
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to upload avatar"); // Explain error.response?.data?.message
+      const message = error.response?.data?.message || "Failed to update avatar";
+      toast.error(message);
       return false;
     } finally {
-      set({ isUploadingAvatar: false });
+      set({ isLoading: false });
     }
   }
+
 }));
 
 export default useAuthStore;

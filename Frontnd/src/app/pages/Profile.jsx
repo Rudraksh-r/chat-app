@@ -2,14 +2,14 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { User, Mail, Lock, Camera, ArrowLeft, Save, LogOut, Loader2 } from "lucide-react";
-import { Button, Input } from "../components/ui/index";
+import { Button, Input, Avatar } from "../components/ui/index";
 import { toast } from "sonner";
 import useAuthStore from "../store/authStore";
 import { getAvatarUrl } from "../lib/avatar";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { authUser, logout, updateProfile, uploadAvatar, isLoading, isUploadingAvatar } = useAuthStore();
+  const { authUser, logout, updateProfile, updateAvatar, isLoading } = useAuthStore();
 
   const [fullName, setFullName] = useState(authUser?.fullName || "");
   const [username, setUsername] = useState(authUser?.username || "");
@@ -31,43 +31,22 @@ export function Profile() {
     }
   }, [authUser]);
 
-  const handleAvatarClick = () => {
-    // Programmatically click the hidden file input.
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
+  // Handler called when user picks a file
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file type on the frontend too.
-    // The backend validates as well — this is just for a better UX
-    // (instant feedback without a network round trip).
+    // Basic client-side validation before hitting the server
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
     }
-
-    // Validate file size on the frontend (5MB limit mirrors backend).
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be smaller than 5MB");
+      toast.error("Image must be under 5MB");
       return;
     }
 
-    // Create a local object URL for instant preview.
-    // URL.createObjectURL() creates a temporary URL pointing to the
-    // file in memory — the image renders immediately with zero latency.
-    const previewUrl = URL.createObjectURL(file);
-    setAvatarPreview(previewUrl);
-
-    // Upload in the background while the preview is already showing.
-    await uploadAvatar(file);
-
-    // Clean up the temporary object URL to prevent memory leaks.
-    // Once the upload is done, authUser.avatar.url will have the
-    // real Cloudinary URL, so the preview is no longer needed.
-    URL.revokeObjectURL(previewUrl);
-    setAvatarPreview(null);
+    await updateAvatar(file);
   };
 
   const handleSave = async (e) => {
@@ -112,30 +91,10 @@ export function Profile() {
 
           {/* Avatar Section */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-10">
-            <div
-              className="relative group cursor-pointer shrink-0"
-              onClick={handleAvatarClick}
-            >
-              {/* Hidden file input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-
-              <img
-                src={displayAvatar}
-                alt="Profile avatar"
-                className="w-20 h-20 rounded-full object-cover border-2 border-slate-700"
-              />
-
-              {/* Upload overlay — shows on hover or while uploading */}
-              <div className={`absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center transition-opacity border-2 border-indigo-500
-                ${isUploadingAvatar ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-              >
-                {isUploadingAvatar ? (
+            <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
+              <Avatar src={avatarPreview || getAvatarUrl(authUser)} size="xl" />
+              <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity border-2 border-indigo-500">
+                {isLoading ? (
                   <Loader2 className="w-6 h-6 text-white animate-spin" />
                 ) : (
                   <>
@@ -144,6 +103,14 @@ export function Profile() {
                   </>
                 )}
               </div>
+              {/* Hidden file input — triggered by clicking the avatar */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
             </div>
 
             <div className="text-center sm:text-left space-y-1 mt-2 sm:mt-0">
@@ -156,10 +123,10 @@ export function Profile() {
                   type="button"
                   variant="secondary"
                   size="sm"
-                  onClick={handleAvatarClick}
-                  disabled={isUploadingAvatar}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
                 >
-                  {isUploadingAvatar ? (
+                  {isLoading ? (
                     <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Uploading...</>
                   ) : (
                     "Upload new"

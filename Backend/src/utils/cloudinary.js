@@ -1,62 +1,52 @@
 import { v2 as cloudinary } from "cloudinary";
 
-// Configure Cloudinary with credentials from environment variables.
-// This runs once when the module is first imported.
-// process.env values are loaded by dotenv in server.js before this runs.
+// Configure once, here, using env vars
 cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 /**
- * Uploads a file buffer to Cloudinary.
+ * Uploads a file buffer to Cloudinary using a signed upload_stream.
+ * Works with multer memoryStorage — no temp files needed.
  *
- * @param {Buffer} fileBuffer - The raw file data from Multer's memoryStorage
- * @param {string} folder - The Cloudinary folder to organize uploads (e.g. "avatars", "messages")
- * @returns {Promise<string>} - Resolves with the secure HTTPS URL of the uploaded file
+ * @param {Buffer} fileBuffer - The file buffer from multer
+ * @param {Object} options - Cloudinary upload options
+ * @returns {Promise<Object>} - Cloudinary upload result
  */
-export const uploadToCloudinary = (fileBuffer, folder) => {
-    return new Promise((resolve, reject) => {
-        // upload_stream is Cloudinary's method for streaming a buffer.
-        // It doesn't accept a file path — it accepts a readable stream or buffer.
-        const uploadStream = cloudinary.uploader.upload_stream(
-            {
-                folder: folder,
-                resource_type: "auto",
-            },
-            (error, result) => {
-                if (error) {
-                    console.error("❌ Cloudinary Stream Error:", error);
-                    return reject(error);
-                }
-                console.log("🚀 Cloudinary Stream Success!");
-                resolve({
-                    url: result.secure_url,
-                    public_id: result.public_id
-                });
-            }
-        );
+export const uploadToCloudinary = (fileBuffer, options = {}) => {
+  return new Promise((resolve, reject) => {
+    const uploadOptions = {
+      folder: "chat_app/avatars",
+      resource_type: "image",
+      transformation: [
+        { width: 400, height: 400, crop: "fill", gravity: "face" },
+        { quality: "auto", fetch_format: "auto" },
+      ],
+      ...options,
+    };
 
-        // .end() pipes the buffer into the stream and signals completion.
-        // Without this, the stream would hang open forever waiting for data.
-        uploadStream.end(fileBuffer);
-    });
+    console.log("☁️  Starting Cloudinary upload...");
+    console.log("   cloud_name:", process.env.CLOUDINARY_CLOUD_NAME);
+    console.log("   api_key:", process.env.CLOUDINARY_API_KEY ? "✅ set" : "❌ MISSING");
+    console.log("   api_secret:", process.env.CLOUDINARY_API_SECRET ? "✅ set" : "❌ MISSING");
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      uploadOptions,
+      (error, result) => {
+        if (error) {
+          console.error("❌ Cloudinary upload failed:", error.message);
+          console.error("   HTTP status:", error.http_code);
+          return reject(error);
+        }
+        console.log("✅ Cloudinary upload success:", result.secure_url);
+        resolve(result);
+      }
+    );
+
+    uploadStream.end(fileBuffer);
+  });
 };
 
-/**
- * Deletes a file from Cloudinary by its public ID.
- * Useful for replacing avatars — delete the old one to save storage.
- *
- * @param {string} publicId - The Cloudinary public ID of the file
- * @returns {Promise<void>}
- */
-export const deleteFromCloudinary = async (publicId) => {
-    // We wrap in try/catch here because a failed delete should never
-    // crash the app — it's a background cleanup task, not critical.
-    try {
-        await cloudinary.uploader.destroy(publicId);
-    } catch (error) {
-        console.error("Cloudinary delete failed:", error);
-    }
-};
+export default cloudinary;
