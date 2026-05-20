@@ -12,7 +12,11 @@ const messageSchema = new Schema({
     },
     text: {
         type: String,
-        required: true
+        default: "",
+    },
+    image: {
+        type: String,
+        default: "",
     },
     status: {
         type: String,

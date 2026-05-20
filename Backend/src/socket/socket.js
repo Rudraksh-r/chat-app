@@ -4,6 +4,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/user.model.js";
 import { Message } from "../models/message.model.js";
+import { Conversation } from "../models/conversation.model.js";
 import { SOCKET_EVENTS } from "./events.js";
 
 const app = express();
@@ -119,12 +120,33 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
     // ─────────────────────────────────────────────────────
 
     // Listen for typing events
-    socket.on(SOCKET_EVENTS.TYPING_START, (receiverId) => {
+    socket.on(SOCKET_EVENTS.TYPING_START, async (payload) => {
         try {
             if (isRateLimited(socket.id)) return; // #8: Rate limit
-            const receiverSocketIds = getReceiverSocketIds(receiverId);
-            receiverSocketIds.forEach((sid) => {
-                io.to(sid).emit(SOCKET_EVENTS.TYPING_START, userId);
+            let targetUserIds = [];
+            let convoId = null;
+
+            if (typeof payload === "object" && payload !== null) {
+                convoId = payload.convoId;
+                if (payload.receiverId) {
+                    targetUserIds = [payload.receiverId];
+                } else if (payload.convoId) {
+                    const conversation = await Conversation.findById(payload.convoId);
+                    if (conversation) {
+                        targetUserIds = conversation.members
+                            .filter(m => m.toString() !== userId)
+                            .map(m => m.toString());
+                    }
+                }
+            } else if (typeof payload === "string") {
+                targetUserIds = [payload];
+            }
+
+            targetUserIds.forEach((targetId) => {
+                const receiverSocketIds = getReceiverSocketIds(targetId);
+                receiverSocketIds.forEach((sid) => {
+                    io.to(sid).emit(SOCKET_EVENTS.TYPING_START, convoId ? { convoId, userId } : userId);
+                });
             });
         } catch (error) {
             console.error("❌ Typing event error:", error.message);
@@ -132,11 +154,32 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
         }
     });
 
-    socket.on(SOCKET_EVENTS.TYPING_STOP, (receiverId) => {
+    socket.on(SOCKET_EVENTS.TYPING_STOP, async (payload) => {
         try {
-            const receiverSocketIds = getReceiverSocketIds(receiverId);
-            receiverSocketIds.forEach((sid) => {
-                io.to(sid).emit(SOCKET_EVENTS.TYPING_STOP, userId);
+            let targetUserIds = [];
+            let convoId = null;
+
+            if (typeof payload === "object" && payload !== null) {
+                convoId = payload.convoId;
+                if (payload.receiverId) {
+                    targetUserIds = [payload.receiverId];
+                } else if (payload.convoId) {
+                    const conversation = await Conversation.findById(payload.convoId);
+                    if (conversation) {
+                        targetUserIds = conversation.members
+                            .filter(m => m.toString() !== userId)
+                            .map(m => m.toString());
+                    }
+                }
+            } else if (typeof payload === "string") {
+                targetUserIds = [payload];
+            }
+
+            targetUserIds.forEach((targetId) => {
+                const receiverSocketIds = getReceiverSocketIds(targetId);
+                receiverSocketIds.forEach((sid) => {
+                    io.to(sid).emit(SOCKET_EVENTS.TYPING_STOP, convoId ? { convoId, userId } : userId);
+                });
             });
         } catch (error) {
             console.error("❌ Stop typing event error:", error.message);

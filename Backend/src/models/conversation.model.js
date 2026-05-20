@@ -11,6 +11,23 @@ const convoSchema = new Schema(
         lastMessage: {
             type: String,
             default: ""
+        },
+        isGroupChat: {
+            type: Boolean,
+            default: false
+        },
+        groupName: {
+            type: String,
+            default: ""
+        },
+        groupAdmin: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            default: null
+        },
+        groupAvatar: {
+            type: String,
+            default: ""
         }
     },
     { timestamps: true }

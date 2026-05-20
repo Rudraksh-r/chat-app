@@ -34,13 +34,62 @@ const createConvo = asyncHandler(async (req, res) => {
         )
 })
 
+const createGroup = asyncHandler(async (req, res) => {
+    const { groupName, members } = req.body;
+    const senderId = req.user._id;
+
+    if (!groupName || !members) {
+        throw new ApiError(400, "Group name and members are required");
+    }
+
+    let parsedMembers = [];
+    if (typeof members === "string") {
+        try {
+            parsedMembers = JSON.parse(members);
+        } catch (e) {
+            throw new ApiError(400, "Invalid format for members array");
+        }
+    } else {
+        parsedMembers = members;
+    }
+
+    if (!Array.isArray(parsedMembers) || parsedMembers.length === 0) {
+        throw new ApiError(400, "Members must be a non-empty array of user IDs");
+    }
+
+    // Include the sender in the group members list
+    const allMembers = Array.from(new Set([...parsedMembers, senderId.toString()]));
+
+    if (allMembers.length < 2) {
+        throw new ApiError(400, "A group must have at least 2 members");
+    }
+
+    const conversation = await Conversation.create({
+        members: allMembers,
+        isGroupChat: true,
+        groupName,
+        groupAdmin: senderId,
+        groupAvatar: req.body.groupAvatar || ""
+    });
+
+    const populatedConvo = await Conversation.findById(conversation._id)
+        .populate("members", "fullName username email avatar lastSeen")
+        .populate("groupAdmin", "fullName username email avatar lastSeen");
+
+    return res
+        .status(201)
+        .json(
+            new ApiResponse(201, populatedConvo, "Group conversation created successfully")
+        );
+});
+
 const getAllConvo = asyncHandler( async (req, res) => {
     const conversations = await Conversation.find({
         members: req.user._id
     })
     .populate("members", "fullName username email avatar lastSeen")
+    .populate("groupAdmin", "fullName username email avatar lastSeen")
     .sort({updatedAt: -1})
-    // what does .sort({updatedAt: -1}) do?
 
     return res
         .status(200)
@@ -49,4 +98,4 @@ const getAllConvo = asyncHandler( async (req, res) => {
         )
 })
 
-export {createConvo, getAllConvo}
+export {createConvo, getAllConvo, createGroup}

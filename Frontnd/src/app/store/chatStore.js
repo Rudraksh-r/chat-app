@@ -10,22 +10,44 @@ const useChatStore = create((set, get) => ({
   messages: [],
   isLoadingConversations: false,
   isLoadingMessages: false,
+  isLoadingMore: false,
   isSending: false,
   onlineUsers: [],
   typingUsers: [], // array of userIds currently typing
+  unreadCounts: {},
+  page: 1,
+  hasMore: false,
 
   // Set online users (called from socketStore)
   setOnlineUsers: (users) => set({ onlineUsers: users }),
 
   // Set typing users
-  addTypingUser: (userId) => {
+  addTypingUser: (typingData) => {
     const { typingUsers } = get();
-    if (!typingUsers.includes(userId)) {
-      set({ typingUsers: [...typingUsers, userId] });
+    if (typeof typingData === "object" && typingData !== null) {
+      const { convoId, userId } = typingData;
+      const exists = typingUsers.some(t => typeof t === "object" && t.convoId === convoId && t.userId === userId);
+      if (!exists) {
+        set({ typingUsers: [...typingUsers, typingData] });
+      }
+    } else {
+      if (!typingUsers.includes(typingData)) {
+        set({ typingUsers: [...typingUsers, typingData] });
+      }
     }
   },
-  removeTypingUser: (userId) => {
-    set({ typingUsers: get().typingUsers.filter(id => id !== userId) });
+  removeTypingUser: (typingData) => {
+    const { typingUsers } = get();
+    if (typeof typingData === "object" && typingData !== null) {
+      const { convoId, userId } = typingData;
+      set({
+        typingUsers: typingUsers.filter(t => 
+          !(typeof t === "object" && t.convoId === convoId && t.userId === userId)
+        )
+      });
+    } else {
+      set({ typingUsers: typingUsers.filter(id => id !== typingData) });
+    }
   },
 
   // Fetch all conversations for the logged-in user
@@ -44,10 +66,20 @@ const useChatStore = create((set, get) => ({
 
   // Set the active conversation and fetch its messages
   setActiveConversation: async (conversation) => {
-    set({ activeConversation: conversation, messages: [], isLoadingMessages: true });
+    const { unreadCounts } = get();
+    // Clear unread count for this conversation when opened
+    set({ 
+      activeConversation: conversation, 
+      messages: [], 
+      isLoadingMessages: true,
+      page: 1,
+      hasMore: false,
+      unreadCounts: { ...unreadCounts, [conversation._id]: 0 }
+    });
     try {
-      const res = await axiosInstance.get(`/message/${conversation._id}`);
-      set({ messages: res.data.data });
+      const res = await axiosInstance.get(`/message/${conversation._id}?limit=20&page=1`);
+      const { messages, hasMore } = res.data.data;
+      set({ messages, hasMore, page: 1 });
     } catch (error) {
       console.error('Failed to fetch messages:', error);
       toast.error('Failed to load messages');
@@ -57,24 +89,31 @@ const useChatStore = create((set, get) => ({
   },
 
   // Send a message
-  sendMessage: async (text) => {
+  sendMessage: async (text, file = null) => {
     const { activeConversation, messages } = get();
     if (!activeConversation) return;
 
     set({ isSending: true });
     try {
-      const res = await axiosInstance.post('/message/send', {
-        convoId: activeConversation._id,
-        text,
-      });
+      const formData = new FormData();
+      formData.append("convoId", activeConversation._id);
+      if(text) formData.append("text", text);
+      if (file) formData.append("image", file);
+
+      const res = await axiosInstance.post('/message/send', formData);
+      const newMessage = res.data.data;
+      
       // Append the new message to the messages array
-      set({ messages: [...messages, res.data.data] });
+      set({ messages: [...messages, newMessage] });
 
       // Update the conversation's lastMessage in the sidebar
+
+      const sidebarMessageText = newMessage.image ? (newMessage.text || "📷 Image") : newMessage.text;
+      
       set({
         conversations: get().conversations.map(c =>
           c._id === activeConversation._id
-            ? { ...c, lastMessage: text, updatedAt: new Date().toISOString() }
+            ? { ...c, lastMessage: sidebarMessageText, updatedAt: new Date().toISOString() }
             : c
         ),
       });
@@ -87,19 +126,47 @@ const useChatStore = create((set, get) => ({
   },
 
   // Handle incoming real-time message (called from socketStore)
-  addIncomingMessage: (message) => {
-    const { activeConversation, messages, conversations } = get();
+  addIncomingMessage: async (message) => {
+    const { activeConversation, messages, conversations, unreadCounts } = get();
+
+    const isCurrentConvo = activeConversation && message.convoId === activeConversation._id;
+
+    // Check if the conversation is in the sidebar. If not, fetch them to sync the new convo/group
+    const existingConvo = conversations.find(c => c._id === message.convoId);
+    if (!existingConvo) {
+      await get().getConversations();
+    }
+
+    // Re-retrieve conversations after sync in case it was updated
+    const currentConversations = get().conversations;
 
     // If the message belongs to the currently active conversation, append it
-    if (activeConversation && message.convoId === activeConversation._id) {
+    if (isCurrentConvo) {
       set({ messages: [...messages, message] });
+    } else {
+      // If it's for a different conversation, show a toast and increment unread count
+      const convo = currentConversations.find(c => c._id === message.convoId);
+      const sender = convo?.members.find(m => m._id === message.senderId);
+      const senderName = sender?.fullName || "Someone";
+      
+      const previewText = message.image ? "📷 Image" : message.text;
+      toast(`New message from ${senderName}`, { description: previewText });
+
+      set({
+        unreadCounts: {
+          ...unreadCounts,
+          [message.convoId]: (unreadCounts[message.convoId] || 0) + 1,
+        }
+      });
     }
 
     // Update sidebar lastMessage for the relevant conversation
+    const sidebarMessageText = message.image ? (message.text || "📷 Image") : message.text;
+
     set({
-      conversations: conversations.map(c =>
+      conversations: currentConversations.map(c =>
         c._id === message.convoId
-          ? { ...c, lastMessage: message.text, updatedAt: new Date().toISOString() }
+          ? { ...c, lastMessage: sidebarMessageText, updatedAt: new Date().toISOString() }
           : c
       ),
     });
@@ -139,6 +206,48 @@ const useChatStore = create((set, get) => ({
       console.error('Failed to create conversation:', error);
       toast.error('Failed to start conversation');
       return null;
+    }
+  },
+
+  // Create a new group conversation
+  createGroupConversation: async (groupName, memberIds) => {
+    try {
+      const res = await axiosInstance.post('/conversation/group', { groupName, members: memberIds });
+      const conversation = res.data.data;
+      
+      const { conversations } = get();
+      set({ conversations: [conversation, ...conversations] });
+      
+      await get().setActiveConversation(conversation);
+      return conversation;
+    } catch (error) {
+      console.error('Failed to create group conversation:', error);
+      toast.error(error.response?.data?.message || 'Failed to create group chat');
+      return null;
+    }
+  },
+
+  // Load more historical messages for pagination
+  loadMoreMessages: async () => {
+    const { activeConversation, messages, page, hasMore, isLoadingMore } = get();
+    if (!activeConversation || !hasMore || isLoadingMore) return;
+
+    set({ isLoadingMore: true });
+    try {
+      const nextPage = page + 1;
+      const res = await axiosInstance.get(`/message/${activeConversation._id}?limit=20&page=${nextPage}`);
+      const { messages: newMessages, hasMore: nextHasMore } = res.data.data;
+      
+      set({
+        messages: [...newMessages, ...messages],
+        page: nextPage,
+        hasMore: nextHasMore
+      });
+    } catch (error) {
+      console.error('Failed to load more messages:', error);
+      toast.error('Failed to load older messages');
+    } finally {
+      set({ isLoadingMore: false });
     }
   },
 

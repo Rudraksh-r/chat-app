@@ -81,15 +81,15 @@ const useSocketStore = create((set, get) => ({
   },
 
   // Emit typing event
-  emitTyping: (receiverId) => {
+  emitTyping: (payload) => {
     const { socket } = get();
-    if (socket) socket.emit(SOCKET_EVENTS.TYPING_START, receiverId);
+    if (socket) socket.emit(SOCKET_EVENTS.TYPING_START, payload);
   },
 
   // Emit stop typing event
-  emitStopTyping: (receiverId) => {
+  emitStopTyping: (payload) => {
     const { socket } = get();
-    if (socket) socket.emit(SOCKET_EVENTS.TYPING_STOP, receiverId);
+    if (socket) socket.emit(SOCKET_EVENTS.TYPING_STOP, payload);
   },
 
   // Emit message seen event
