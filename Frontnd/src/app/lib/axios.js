@@ -9,4 +9,13 @@ const axiosInstance = axios.create({
   // multipart boundary — overriding it breaks the upload.
 });
 
+
 export default axiosInstance;
+
+// Export API helper for "Delete for Everyone"
+export const deleteMessageForEveryone = (messageId) =>
+  axiosInstance.patch(`/message/${messageId}/delete-for-everyone`);
+
+// Export API helper for "Delete for Me"
+export const deleteMessageForMe = (messageId) =>
+  axiosInstance.patch(`/message/${messageId}/delete`);

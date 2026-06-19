@@ -22,7 +22,25 @@ const messageSchema = new Schema({
         type: String,
         enum: ["sent", "delivered", "seen"],
         default: "sent"
-    }
+    },
+    deletedForEveryone: {
+        type: Boolean,
+        default: false,
+    },
+    deletedFor: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: "User"
+        }
+    ],
+    deletedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User", default: null
+    },
+    deletedBySenderAt: {
+        type: Date,
+        default: null
+    },
 }, { timestamps: true });
 
 export const Message = mongoose.model("Message", messageSchema);

@@ -18,6 +18,8 @@ import {
   X,
   LogOut,
   Loader2,
+  Ban,
+  Trash2,
 } from "lucide-react";
 import { formatTime, formatTimeAgo, cn } from "../lib/utils";
 import { Button, Avatar } from "../components/ui/index";
@@ -45,11 +47,20 @@ export function ChatLayout() {
     createConversation,
     createGroupConversation,
     loadMoreMessages,
+    deleteMessageForEveryone,
+    deleteMessageForMe,
     unreadCounts,
   } = useChatStore();
   const { emitTyping, emitStopTyping, emitMessageSeen } = useSocketStore();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [contextMenuMsgId, setContextMenuMsgId] = useState(null);
+
+  useEffect(() => {
+    const handleClick = () => setContextMenuMsgId(null);
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, []);
   const [messageText, setMessageText] = useState("");
   const [mediaPreview, setMediaPreview] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -581,15 +592,59 @@ export function ChatLayout() {
                     const sender = activeConversation.members?.find((m) => m._id === msg.senderId);
 
                     return (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        key={msg._id}
-                        className={cn(
-                          "flex w-full",
-                          isMe ? "justify-end" : "justify-start",
-                        )}
-                      >
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          key={msg._id}
+                          onContextMenu={(e) => { 
+                            e.preventDefault(); 
+                            setContextMenuMsgId(msg._id);
+                          }}
+                          className={cn(
+                            "flex w-full relative",
+                            isMe ? "justify-end" : "justify-start",
+                          )}
+                        >
+                          <AnimatePresence>
+                            {contextMenuMsgId === msg._id && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                transition={{ duration: 0.1 }}
+                                className={cn(
+                                  "absolute z-50 bottom-full mb-1 min-w-[180px] bg-[#1E293B] border border-slate-700/60 shadow-xl rounded-xl py-1 overflow-hidden backdrop-blur-xl",
+                                  isMe ? "right-8" : "left-8"
+                                )}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  onClick={() => {
+                                    deleteMessageForMe(msg._id);
+                                    setContextMenuMsgId(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
+                                >
+                                  <Trash2 className="w-4 h-4 text-slate-400" />
+                                  Delete for me
+                                </button>
+                                
+                                {msg.senderId === authUser?._id && 
+                                 (Date.now() - new Date(msg.createdAt).getTime() < 60 * 60 * 1000) && (
+                                  <button
+                                    onClick={() => {
+                                      deleteMessageForEveryone(msg._id);
+                                      setContextMenuMsgId(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                                  >
+                                    <Ban className="w-4 h-4" />
+                                    Delete for everyone
+                                  </button>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         <div
                           className={cn(
                             "flex max-w-[85%] sm:max-w-[70%] gap-2 sm:gap-3",
@@ -634,11 +689,15 @@ export function ChatLayout() {
                                   onClick={() => setSelectedImageModal(msg.image)}
                                 />
                               )}
-                              {msg.text && (
-                                <p className="text-[15px] leading-relaxed break-words">
-                                  {msg.text}
-                                </p>
-                              )}
+                              {msg.deletedForEveryone ? (
+                                 <div className="text-sm italic text-slate-400">Message deleted</div>
+                               ) : (
+                                 msg.text && (
+                                   <p className="text-[15px] leading-relaxed break-words">
+                                     {msg.text}
+                                   </p>
+                                 )
+                               )}
                             </div>
                             <div className="flex items-center gap-1 mt-1 px-1">
                               <span className="text-[11px] text-slate-500">
@@ -1117,7 +1176,7 @@ export function ChatLayout() {
           </motion.div>
         )}
       </AnimatePresence>
-      <style>{`
+      <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }

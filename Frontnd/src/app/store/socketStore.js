@@ -12,6 +12,7 @@ const SOCKET_EVENTS = {
   TYPING_START: "typing:start",
   TYPING_STOP: "typing:stop",
   ERROR: "socket:error",
+  MESSAGE_DELETED: "message:deleted",
 };
 
 const useSocketStore = create((set, get) => ({
@@ -68,6 +69,10 @@ const useSocketStore = create((set, get) => ({
       console.log('🔴 Socket disconnected');
     });
 
+    newSocket.on(SOCKET_EVENTS.MESSAGE_DELETED, ({ messageId, convoId, permanently }) => {
+      useChatStore.getState().markMessagesAsDeleted(messageId, convoId, permanently);
+    });
+
     set({ socket: newSocket });
   },
 
@@ -97,6 +102,8 @@ const useSocketStore = create((set, get) => ({
     const { socket } = get();
     if (socket) socket.emit(SOCKET_EVENTS.MESSAGE_SEEN, { convoId, senderId });
   },
+
+
 }));
 
 export default useSocketStore;

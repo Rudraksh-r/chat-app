@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import axiosInstance from '../lib/axios';
+import axiosInstance, { deleteMessageForEveryone as deleteMessageForEveryoneAPI, deleteMessageForMe as deleteMessageForMeAPI } from '../lib/axios';
 import { toast } from 'sonner';
 import useAuthStore from './authStore';
+
 
 const useChatStore = create((set, get) => ({
   // State
@@ -17,6 +18,7 @@ const useChatStore = create((set, get) => ({
   unreadCounts: {},
   page: 1,
   hasMore: false,
+  isDeleting: false,
 
   // Set online users (called from socketStore)
   setOnlineUsers: (users) => set({ onlineUsers: users }),
@@ -41,7 +43,7 @@ const useChatStore = create((set, get) => ({
     if (typeof typingData === "object" && typingData !== null) {
       const { convoId, userId } = typingData;
       set({
-        typingUsers: typingUsers.filter(t => 
+        typingUsers: typingUsers.filter(t =>
           !(typeof t === "object" && t.convoId === convoId && t.userId === userId)
         )
       });
@@ -68,9 +70,9 @@ const useChatStore = create((set, get) => ({
   setActiveConversation: async (conversation) => {
     const { unreadCounts } = get();
     // Clear unread count for this conversation when opened
-    set({ 
-      activeConversation: conversation, 
-      messages: [], 
+    set({
+      activeConversation: conversation,
+      messages: [],
       isLoadingMessages: true,
       page: 1,
       hasMore: false,
@@ -97,19 +99,19 @@ const useChatStore = create((set, get) => ({
     try {
       const formData = new FormData();
       formData.append("convoId", activeConversation._id);
-      if(text) formData.append("text", text);
+      if (text) formData.append("text", text);
       if (file) formData.append("image", file);
 
       const res = await axiosInstance.post('/message/send', formData);
       const newMessage = res.data.data;
-      
+
       // Append the new message to the messages array
       set({ messages: [...messages, newMessage] });
 
       // Update the conversation's lastMessage in the sidebar
 
       const sidebarMessageText = newMessage.image ? (newMessage.text || "📷 Image") : newMessage.text;
-      
+
       set({
         conversations: get().conversations.map(c =>
           c._id === activeConversation._id
@@ -148,7 +150,7 @@ const useChatStore = create((set, get) => ({
       const convo = currentConversations.find(c => c._id === message.convoId);
       const sender = convo?.members.find(m => m._id === message.senderId);
       const senderName = sender?.fullName || "Someone";
-      
+
       const previewText = message.image ? "📷 Image" : message.text;
       toast(`New message from ${senderName}`, { description: previewText });
 
@@ -214,10 +216,10 @@ const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.post('/conversation/group', { groupName, members: memberIds });
       const conversation = res.data.data;
-      
+
       const { conversations } = get();
       set({ conversations: [conversation, ...conversations] });
-      
+
       await get().setActiveConversation(conversation);
       return conversation;
     } catch (error) {
@@ -237,7 +239,7 @@ const useChatStore = create((set, get) => ({
       const nextPage = page + 1;
       const res = await axiosInstance.get(`/message/${activeConversation._id}?limit=20&page=${nextPage}`);
       const { messages: newMessages, hasMore: nextHasMore } = res.data.data;
-      
+
       set({
         messages: [...newMessages, ...messages],
         page: nextPage,
@@ -250,6 +252,84 @@ const useChatStore = create((set, get) => ({
       set({ isLoadingMore: false });
     }
   },
+
+  //soft-delete message (delete for everyone)
+  deleteMessage: async (messageId) => {
+    set({ isDeleting: true });
+    try {
+      await axiosInstance.patch(`/message/${messageId}/delete`);
+      toast.success('Message deleted for everyone');
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      toast.error('Failed to delete message');
+    } finally {
+      set({ isDeleting: false });
+    }
+  },
+  // Alias for clarity
+  deleteMessageForEveryone: async (messageId) => {
+    try {
+      await deleteMessageForEveryoneAPI(messageId);
+      toast.success('Message deleted for everyone');
+    } catch (error) {
+      console.error('Failed to delete for everyone:', error);
+      toast.error('Failed to delete for everyone');
+    }
+  },
+
+  deleteMessageForMe: async (messageId) => {
+    set({ isDeleting: true });
+    try {
+      await deleteMessageForMeAPI(messageId);
+      toast.success('Message deleted for you');
+      // The socket event will trigger markMessagesAsDeleted locally
+    } catch (error) {
+      console.error('Failed to delete message for you:', error);
+      toast.error('Failed to delete message');
+    } finally {
+      set({ isDeleting: false });
+    }
+  },
+
+  markMessagesAsDeleted: (messageId, convoId, permanently) => {
+    const { conversations, activeConversation, messages } = get();
+
+    let newMessages = messages;
+    if (activeConversation && activeConversation._id === convoId) {
+      if (permanently) {
+        newMessages = messages.map((msg) =>
+          msg._id === messageId ? { ...msg, deletedForEveryone: true, text: "Message deleted", image: null } : msg
+        );
+      } else {
+        newMessages = messages.filter((msg) => msg._id !== messageId);
+      }
+      set({ messages: newMessages });
+    }
+
+    set({
+      conversations: conversations.map(c => {
+        if (c._id === convoId) {
+          let sidebarMessageText = c.lastMessage;
+          
+          if (activeConversation && activeConversation._id === convoId) {
+            if (newMessages.length > 0) {
+              const lastMsg = newMessages[newMessages.length - 1];
+              sidebarMessageText = lastMsg.deletedForEveryone ? "Message deleted" : (lastMsg.image ? (lastMsg.text || "📷 Image") : lastMsg.text);
+            } else {
+              sidebarMessageText = "No messages yet";
+            }
+          } else if (permanently) {
+             sidebarMessageText = "Message deleted";
+          }
+          
+          return { ...c, lastMessage: sidebarMessageText, updatedAt: new Date().toISOString() };
+        }
+        return c;
+      })
+    });
+  },
+
+
 
   // Search users
   searchUsers: async (keyword) => {
