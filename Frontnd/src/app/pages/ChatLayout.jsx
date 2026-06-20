@@ -20,6 +20,7 @@ import {
   Loader2,
   Ban,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { formatTime, formatTimeAgo, cn } from "../lib/utils";
 import { Button, Avatar } from "../components/ui/index";
@@ -50,11 +51,14 @@ export function ChatLayout() {
     deleteMessageForEveryone,
     deleteMessageForMe,
     unreadCounts,
+    editMessage,
   } = useChatStore();
   const { emitTyping, emitStopTyping, emitMessageSeen } = useSocketStore();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [contextMenuMsgId, setContextMenuMsgId] = useState(null);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editMessageText, setEditMessageText] = useState("");
 
   useEffect(() => {
     const handleClick = () => setContextMenuMsgId(null);
@@ -630,6 +634,21 @@ export function ChatLayout() {
                                 </button>
                                 
                                 {msg.senderId === authUser?._id && 
+                                 (Date.now() - new Date(msg.createdAt).getTime() < 15 * 60 * 1000) && (
+                                  <button
+                                    onClick={() => {
+                                      setEditingMessageId(msg._id);
+                                      setEditMessageText(msg.text);
+                                      setContextMenuMsgId(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
+                                  >
+                                    <Pencil className="w-4 h-4 text-slate-400" />
+                                    Edit message
+                                  </button>
+                                )}
+
+                                {msg.senderId === authUser?._id && 
                                  (Date.now() - new Date(msg.createdAt).getTime() < 60 * 60 * 1000) && (
                                   <button
                                     onClick={() => {
@@ -691,11 +710,47 @@ export function ChatLayout() {
                               )}
                               {msg.deletedForEveryone ? (
                                  <div className="text-sm italic text-slate-400">Message deleted</div>
+                               ) : editingMessageId === msg._id ? (
+                                 <div className="flex flex-col gap-2 min-w-[200px]">
+                                   <input
+                                     type="text"
+                                     value={editMessageText}
+                                     onChange={(e) => setEditMessageText(e.target.value)}
+                                     onKeyDown={async (e) => {
+                                       if (e.key === "Enter") {
+                                         e.preventDefault();
+                                         if (editMessageText.trim() && editMessageText !== msg.text) {
+                                           await editMessage(msg._id, editMessageText);
+                                         }
+                                         setEditingMessageId(null);
+                                       } else if (e.key === "Escape") {
+                                         setEditingMessageId(null);
+                                       }
+                                     }}
+                                     autoFocus
+                                     className={cn(
+                                       "text-[15px] bg-[#0F172A]/50 text-white rounded-md px-2 py-1 outline-none border transition-colors",
+                                       isMe ? "border-indigo-400 focus:border-white" : "border-slate-600 focus:border-indigo-400"
+                                     )}
+                                   />
+                                   <div className="flex justify-end gap-2 text-xs">
+                                     <button onClick={() => setEditingMessageId(null)} className="text-slate-300 hover:text-white transition-colors">Cancel</button>
+                                     <button onClick={async () => {
+                                        if (editMessageText.trim() && editMessageText !== msg.text) {
+                                          await editMessage(msg._id, editMessageText);
+                                        }
+                                        setEditingMessageId(null);
+                                     }} className="text-white font-medium hover:text-indigo-200 transition-colors">Save</button>
+                                   </div>
+                                 </div>
                                ) : (
                                  msg.text && (
-                                   <p className="text-[15px] leading-relaxed break-words">
-                                     {msg.text}
-                                   </p>
+                                   <div className="flex flex-col">
+                                     <p className="text-[15px] leading-relaxed break-words">
+                                       {msg.text}
+                                     </p>
+                                     {msg.isEdited && <span className="text-[10px] opacity-70 mt-0.5">(edited)</span>}
+                                   </div>
                                  )
                                )}
                             </div>

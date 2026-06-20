@@ -16,6 +16,7 @@ export const SOCKET_EVENTS = {
   MESSAGE_DELIVERED: "message:delivered",// Server → Client: message was delivered
   MESSAGE_SEEN: "message:seen",         // Client ↔ Server: message was read
   MESSAGE_DELETED: "message:deleted",   // Server → Client: soft-deleted message update
+  MESSAGE_EDITED: "message:edited",     // Server → Client: message was edited
 
   // Typing
   TYPING_START: "typing:start",         // Client → Server → Client

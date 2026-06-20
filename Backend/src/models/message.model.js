@@ -41,6 +41,10 @@ const messageSchema = new Schema({
         type: Date,
         default: null
     },
+    isEdited: {
+        type: Boolean,
+        default: false
+    },
 }, { timestamps: true });
 
 export const Message = mongoose.model("Message", messageSchema);

@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import axiosInstance, { deleteMessageForEveryone as deleteMessageForEveryoneAPI, deleteMessageForMe as deleteMessageForMeAPI } from '../lib/axios';
 import { toast } from 'sonner';
 import useAuthStore from './authStore';
+import { convertBoundingBoxToBox, updateMotionValuesFromProps } from 'framer-motion';
+
 
 
 const useChatStore = create((set, get) => ({
@@ -310,7 +312,7 @@ const useChatStore = create((set, get) => ({
       conversations: conversations.map(c => {
         if (c._id === convoId) {
           let sidebarMessageText = c.lastMessage;
-          
+
           if (activeConversation && activeConversation._id === convoId) {
             if (newMessages.length > 0) {
               const lastMsg = newMessages[newMessages.length - 1];
@@ -319,14 +321,65 @@ const useChatStore = create((set, get) => ({
               sidebarMessageText = "No messages yet";
             }
           } else if (permanently) {
-             sidebarMessageText = "Message deleted";
+            sidebarMessageText = "Message deleted";
           }
-          
+
           return { ...c, lastMessage: sidebarMessageText, updatedAt: new Date().toISOString() };
         }
         return c;
       })
     });
+  },
+  //Edit message
+  editMessage: async (messageId, newText) => {
+    try {
+      const res = await axiosInstance.patch(`/message/${messageId}/edit`, { text: newText });
+      const updatedMessage = res.data.data;
+
+      // Local State Mutation (Pessimistic UI Sync on sender side)
+      const updatedMessages = get().messages.map((msg) =>
+        msg._id === messageId ? updatedMessage : msg
+      );
+      set({ messages: updatedMessages });
+
+      // Synchronize Sidebar list view item reference instantly
+      const updatedConversations = get().conversations.map((c) =>
+        c._id === updatedMessage.convoId
+        ? {...c, lastMessage: newText, updatedAt: new Date().toISOString()}
+        : c
+      );
+      set({conversations: updatedConversations});
+      return true;
+    } catch (error) {
+      console.error("Failed executing edit payload", error);
+      toast.error(error.response?.data?.message || "Failed to save message edits");
+      return false;
+    }
+  },
+  // Real-time Event Receiver Handler invoked via socket connection mapping
+  updateIncomingEditMessage: (editedMessage) => {
+    const {activeConversation, messages, setMessages, conversations, setConversations} = get();
+    const {messageId, text, updatedAt} = editedMessage;
+
+    // If the message belongs to the currently active conversation (the one open in chat window)
+    if(activeConversation && activeConversation._id === editedMessage.convoId) {
+      // Update the message in the messages array
+      setMessages(prev => prev.map(msg => 
+        msg._id === messageId
+        ? editedMessage
+        : msg
+      ));
+    }
+
+    // Also update the conversation's last message preview if it was an incoming message
+    if(activeConversation && activeConversation._id === editedMessage.convoId && editedMessage.senderId !== useAuthStore.getState().user._id) {
+      setConversations(prev => prev.map(c => 
+        c._id === editedMessage.convoId
+        ? {...c, lastMessage: editedMessage.text, updatedAt: editedMessage.updatedAt}
+        : c
+      ));
+      set({conversations: setConversations})
+    }
   },
 
 

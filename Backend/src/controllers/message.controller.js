@@ -191,4 +191,57 @@ const deleteForEveryone = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, message, "Message deleted for everyone"));
 });
 
-export { sendMessage, getMessage, deleteMessage, deleteForEveryone }
+const editMessage = asyncHandler(async (req, res) => {
+    const { id: messageId } = req.params
+    const userId = req.user._id
+    const { text } = req.body
+
+    if (!text|| text.trim() == ""){
+        throw new ApiError(400, "Updated text context cannot be blank")
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message){
+        throw new ApiError(404, "Message not found")
+    }
+
+    if(message.senderId.toString() != userId.toString()){
+        throw new ApiError(403, "You are not authorized to edit this message")
+    }
+
+    const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+    if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS) {
+        throw new ApiError(400, "Edit window has expired");
+    }
+
+    // presist modifications
+    message.text = text;
+    message.isEdited = true;
+    await message.save();
+
+    // Update sidebar context
+    const conversation = await Conversation.findById(message.convoId);
+    if(conversation) {
+        const lastSavedMsg = await Message.findOne({ConvoId: message.convoId}).sort({createdAt: -1})
+        if (lastSavedMsg && lastSavedMsg._id.toString() === message._id.toString()) {
+            conversation.lastMessage = text;
+            await conversation.save();
+        }
+    }
+
+    // Broadcast Real-time event to all relevant conversation members
+    if(conversation){
+        conversation.members.forEach((memberId)=> {
+            const clientSockets = getReceiverSocketIds(memberId.toString());
+            clientSockets.forEach((socketId)=>{
+                io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_EDITED, message
+                );
+            })
+        })
+    }
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, message, "Message edited successfully"))
+});
+export { sendMessage, getMessage, deleteMessage, deleteForEveryone, editMessage }
