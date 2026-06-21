@@ -1,5 +1,5 @@
 import express from "express";
-import { sendMessage, getMessage, deleteMessage, deleteForEveryone, editMessage } from "../controllers/message.controller.js";
+import { sendMessage, getMessage, deleteMessage, deleteForEveryone, editMessage, toggleReaction } from "../controllers/message.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
 
@@ -9,6 +9,7 @@ router.post("/send", verifyJWT, upload.single("image"), sendMessage)
 router.get("/:convoId", verifyJWT, getMessage)
 router.patch("/:id/delete", verifyJWT, deleteMessage);
 router.patch("/:id/delete-for-everyone", verifyJWT, deleteForEveryone);
-router.patch("/:id/edit", verifyJWT,editMessage)
+router.patch("/:id/edit", verifyJWT, editMessage)
+router.post("/:id/react", verifyJWT, toggleReaction);
 
 export default router

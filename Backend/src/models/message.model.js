@@ -50,6 +50,19 @@ const messageSchema = new Schema({
         ref: "Message",
         default: null
     },
+    reactions: [
+        {
+            userId: {
+                type: Schema.Types.ObjectId,
+                ref: "User",
+                required: true
+            },
+            emoji: {
+                type: String,
+                required: true
+            }
+        }
+    ]
     // isForwarded: {
     //     type: Boolean,
     //     default: false

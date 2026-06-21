@@ -2,6 +2,7 @@ import { getAvatarUrl } from "../lib/avatar";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import EmojiPicker from "emoji-picker-react";
 import {
   Search,
   Plus,
@@ -30,6 +31,8 @@ import useChatStore from "../store/chatStore";
 import useSocketStore from "../store/socketStore";
 import { toast } from "sonner";
 
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+
 export function ChatLayout() {
   const { authUser, logout } = useAuthStore();
   const {
@@ -56,6 +59,7 @@ export function ChatLayout() {
     replyingToMessage,
     setReplyingToMessage,
     clearReplyingToMessage,
+    sendToggleReaction,
   } = useChatStore();
   const { emitTyping, emitStopTyping, emitMessageSeen } = useSocketStore();
 
@@ -87,6 +91,7 @@ export function ChatLayout() {
   const [mediaPreview, setMediaPreview] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -207,6 +212,7 @@ export function ChatLayout() {
     await sendMessage(text, selectedFile);
 
     removefile();
+    setShowEmojiPicker(false);
 
     // Stop typing indicator
     if (activeConversation) {
@@ -726,12 +732,27 @@ export function ChatLayout() {
                             )}
                             <div
                               className={cn(
-                                "px-4 py-2.5 rounded-2xl shadow-sm flex flex-col gap-2 relative",
+                                "px-4 py-2.5 rounded-2xl shadow-sm flex flex-col gap-2 relative group",
                                 isMe
                                   ? "bg-indigo-600 text-white rounded-br-sm shadow-indigo-600/10"
                                   : "bg-[#1E293B] text-slate-200 rounded-bl-sm border border-slate-800/50",
                               )}
                             >
+                              {/* Floating Reaction Menu */}
+                              <div className={cn(
+                                "group-hover:flex absolute -top-10 hidden bg-[#1E293B] border border-slate-700 p-1.5 rounded-full shadow-xl gap-1 z-20 transition-all",
+                                isMe ? "right-0" : "left-0"
+                              )}>
+                                {REACTION_EMOJIS.map(emoji => (
+                                  <button
+                                    key={emoji}
+                                    onClick={() => sendToggleReaction(msg._id, emoji)}
+                                    className="hover:bg-slate-700/50 rounded-full w-7 h-7 flex items-center justify-center transition-transform hover:scale-110 text-lg cursor-pointer"
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
                               {msg.replyTo && (
                                 <div
                                   onClick={() => handleScrollToParent(msg.replyTo._id)}
@@ -804,6 +825,39 @@ export function ChatLayout() {
                                  )
                                )}
                             </div>
+
+                            {/* Active Reactions Container */}
+                            {msg.reactions && msg.reactions.length > 0 && (
+                              <div className={cn(
+                                "flex flex-wrap gap-1 mt-1 z-10",
+                                isMe ? "justify-end pr-1" : "justify-start pl-1"
+                              )}>
+                                {Object.entries(
+                                  msg.reactions.reduce((acc, curr) => {
+                                    acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
+                                    return acc;
+                                  }, {})
+                                ).map(([emoji, count]) => {
+                                  const hasReacted = msg.reactions.some(r => r.userId === authUser?._id && r.emoji === emoji);
+                                  return (
+                                    <button
+                                      key={emoji}
+                                      onClick={() => sendToggleReaction(msg._id, emoji)}
+                                      className={cn(
+                                        "flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border shadow-sm transition-all hover:scale-105 cursor-pointer",
+                                        hasReacted 
+                                          ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-300" 
+                                          : "bg-[#1E293B] border-slate-700/50 text-slate-300 hover:bg-slate-700/80"
+                                      )}
+                                    >
+                                      <span>{emoji}</span>
+                                      {count > 1 && <span className="font-medium ml-0.5">{count}</span>}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
+
                             <div className="flex items-center gap-1 mt-1 px-1">
                               <span className="text-[11px] text-slate-500">
                                 {formatTime(msg.createdAt)}
@@ -988,15 +1042,28 @@ export function ChatLayout() {
                   <Paperclip className="w-5 h-5" />
                 </Button>
 
-                <div className="flex-1 bg-[#0F172A] border border-slate-800/80 rounded-2xl flex items-end focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all shadow-inner shadow-black/10">
+                <div className="flex-1 bg-[#0F172A] border border-slate-800/80 rounded-2xl flex items-end focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all shadow-inner shadow-black/10 relative">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     className="text-slate-400 hover:text-yellow-500 mb-1 ml-1 shrink-0"
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   >
                     <Smile className="w-5 h-5" />
                   </Button>
+
+                  {showEmojiPicker && (
+                    <div className="absolute bottom-14 left-0 z-50">
+                      <EmojiPicker
+                        theme="dark"
+                        onEmojiClick={(emojiData) => {
+                          setMessageText((prev) => prev + emojiData.emoji);
+                        }}
+                      />
+                    </div>
+                  )}
+
                   <textarea
                     value={messageText}
                     onChange={handleTyping}

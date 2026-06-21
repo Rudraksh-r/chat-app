@@ -392,6 +392,33 @@ const useChatStore = create((set, get) => ({
     }
   },
 
+  sendToggleReaction: async (messageId, emoji) => {
+    try {
+      // Execute the request via the HTTP pipeline
+      const res = await axiosInstance.post(`/message/${messageId}/react`, { emoji });
+      const serverReactions = res.data.data;
+
+      // Optimistic/Pessimistic reconciliation on sender node instantly
+      const structuralRebuild = get().messages.map((m) =>
+        m._id === messageId ? { ...m, reactions: serverReactions } : m
+      );
+      set({ messages: structuralRebuild });
+    } catch (error) {
+      console.error("Failed to apply emoji selection matrix sequence: ", error);
+    }
+  },
+
+  // Real-time socket receiver event listener callback hook
+  updateIncomingReaction: ({ messageId, reactions }) => {
+    const messages = get().messages;
+    const messageIndex = messages.findIndex((msg) => msg._id === messageId);
+    if (messageIndex > -1) {
+      const updatedMessages = [...messages];
+      updatedMessages[messageIndex] = { ...updatedMessages[messageIndex], reactions };
+      set({ messages: updatedMessages });
+    }
+  },
+
 
 
   // Search users

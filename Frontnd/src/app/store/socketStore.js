@@ -13,6 +13,7 @@ const SOCKET_EVENTS = {
   TYPING_STOP: "typing:stop",
   ERROR: "socket:error",
   MESSAGE_DELETED: "message:deleted",
+  MESSAGE_REACTION: "message:reaction",
 };
 
 const useSocketStore = create((set, get) => ({
@@ -71,6 +72,10 @@ const useSocketStore = create((set, get) => ({
 
     newSocket.on(SOCKET_EVENTS.MESSAGE_DELETED, ({ messageId, convoId, permanently }) => {
       useChatStore.getState().markMessagesAsDeleted(messageId, convoId, permanently);
+    });
+
+    newSocket.on(SOCKET_EVENTS.MESSAGE_REACTION, (payload) => {
+      useChatStore.getState().updateIncomingReaction(payload);
     });
 
     set({ socket: newSocket });

@@ -291,4 +291,79 @@ const editMessage = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, message, "Message edited successfully"))
 });
-export { sendMessage, getMessage, deleteMessage, deleteForEveryone, editMessage }
+
+// Rate limiting map for reactions
+const reactionRateLimits = new Map();
+
+// Periodic cleanup for rate limit map to prevent memory leaks
+setInterval(() => {
+    const now = Date.now();
+    for (const [userId, lastTime] of reactionRateLimits.entries()) {
+        if (now - lastTime > 60000) { // remove if older than 1 minute
+            reactionRateLimits.delete(userId);
+        }
+    }
+}, 60000);
+
+const toggleReaction = asyncHandler(async (req, res) => {
+    const { id: messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    // Rate Limiting Debouncer (500ms lock)
+    const now = Date.now();
+    const lastReaction = reactionRateLimits.get(userId.toString());
+    if (lastReaction && now - lastReaction < 500) {
+        throw new ApiError(429, "Too many reaction requests. Please slow down.");
+    }
+    reactionRateLimits.set(userId.toString(), now);
+
+    // Validate Emoji Payload (Regex to match standard emojis & length check)
+    const emojiRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/u;
+    if (!emoji || emoji.trim().length === 0 || emoji.length > 10 || !emojiRegex.test(emoji)) {
+        throw new ApiError(400, "Invalid emoji character payload");
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+        throw new ApiError(404, "Message target resource not found");
+    }
+
+    // Determine if the user has already left a reaction
+    const existingReactionIndex = message.reactions.findIndex(
+        (r) => r.userId.toString() === userId.toString()
+    );
+
+    if (existingReactionIndex > -1) {
+        if (message.reactions[existingReactionIndex].emoji === emoji) {
+            // Remove it if same emoji
+            message.reactions.splice(existingReactionIndex, 1);
+        } else {
+            // Change it if different emoji
+            message.reactions[existingReactionIndex].emoji = emoji;
+        }
+    } else {
+        // Add new reaction
+        message.reactions.push({ userId, emoji });
+    }
+    
+    const updatedMessage = await message.save();
+
+    // Real-Time Propagation via Active Socket Matrix Channels
+    const conversation = await Conversation.findById(message.convoId);
+    if (conversation) {
+        conversation.members.forEach((memberId) => {
+            const targets = getReceiverSocketIds(memberId.toString());
+            targets.forEach((socketId) => {
+                io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_REACTION, {
+                    messageId: message._id,
+                    reactions: updatedMessage.reactions
+                });
+            });
+        });
+    }
+
+    return res.status(200)
+        .json(new ApiResponse(200, updatedMessage.reactions, "Reaction updated successfully"));
+});
+export { sendMessage, getMessage, deleteMessage, deleteForEveryone, editMessage, toggleReaction }
