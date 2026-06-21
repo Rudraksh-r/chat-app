@@ -45,6 +45,61 @@ const messageSchema = new Schema({
         type: Boolean,
         default: false
     },
+    replyTo: {
+        type: Schema.Types.ObjectId,
+        ref: "Message",
+        default: null
+    },
+    // isForwarded: {
+    //     type: Boolean,
+    //     default: false
+    // },
+    // forwardedFrom: {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "User",
+    //     default: null
+    // },
+    // forwardedAt: {
+    //     type: Date,
+    //     default: null
+    // },
+    // isPinned: {
+    //     type: Boolean,
+    //     default: false
+    // },
+    // pinnedBy: {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "User",
+    //     default: null
+    // },
+    // pinnedAt: {
+    //     type: Date,
+    //     default: null
+    // },
+    // messageId: {
+    //     type: String,
+    //     default: "",
+    // },
+    // repliedMessageId: {
+    //     type: String,
+    //     default: "",
+    // },
+    // forwardedMessageId: {
+    //     type: String,
+    //     default: "",
+    // },
+    // editedMessageId: {
+    //     type: String,
+    //     default: "",
+    // },
+    // deletedMessageId: {
+    //     type: String,
+    //     default: "",
+    // },
+    // pinnedMessageId: {
+    //     type: String,
+    //     default: "",
+    // },
 }, { timestamps: true });
 
 export const Message = mongoose.model("Message", messageSchema);

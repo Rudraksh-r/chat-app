@@ -21,6 +21,7 @@ import {
   Ban,
   Trash2,
   Pencil,
+  CornerUpLeft,
 } from "lucide-react";
 import { formatTime, formatTimeAgo, cn } from "../lib/utils";
 import { Button, Avatar } from "../components/ui/index";
@@ -52,8 +53,25 @@ export function ChatLayout() {
     deleteMessageForMe,
     unreadCounts,
     editMessage,
+    replyingToMessage,
+    setReplyingToMessage,
+    clearReplyingToMessage,
   } = useChatStore();
   const { emitTyping, emitStopTyping, emitMessageSeen } = useSocketStore();
+
+  const handleScrollToParent = (parentId) => {
+    const el = document.getElementById(parentId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("highlight-pulse");
+      setTimeout(() => {
+        el.classList.remove("highlight-pulse");
+      }, 2000);
+    }
+  };
+
+  const getMessageSenderId = (msg) => typeof msg.senderId === "object" ? msg.senderId?._id : msg.senderId;
+
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [contextMenuMsgId, setContextMenuMsgId] = useState(null);
@@ -589,14 +607,17 @@ export function ChatLayout() {
                     </div>
                   )}
                   {messages.map((msg, index) => {
-                    const isMe = msg.senderId === authUser?._id;
+                    const senderIdStr = getMessageSenderId(msg);
+                    const isMe = senderIdStr === authUser?._id;
+                    const prevSenderIdStr = index > 0 ? getMessageSenderId(messages[index - 1]) : null;
                     const showAvatar =
                       index === 0 ||
-                      messages[index - 1].senderId !== msg.senderId;
-                    const sender = activeConversation.members?.find((m) => m._id === msg.senderId);
+                      prevSenderIdStr !== senderIdStr;
+                    const sender = activeConversation.members?.find((m) => m._id === senderIdStr);
 
                     return (
                         <motion.div
+                          id={msg._id}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           key={msg._id}
@@ -648,6 +669,17 @@ export function ChatLayout() {
                                   </button>
                                 )}
 
+                                <button
+                                  onClick={() => {
+                                    setReplyingToMessage(msg);
+                                    setContextMenuMsgId(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
+                                >
+                                  <CornerUpLeft className="w-4 h-4 text-slate-400" />
+                                  Reply
+                                </button>
+
                                 {msg.senderId === authUser?._id && 
                                  (Date.now() - new Date(msg.createdAt).getTime() < 60 * 60 * 1000) && (
                                   <button
@@ -694,12 +726,30 @@ export function ChatLayout() {
                             )}
                             <div
                               className={cn(
-                                "px-4 py-2.5 rounded-2xl shadow-sm flex flex-col gap-2",
+                                "px-4 py-2.5 rounded-2xl shadow-sm flex flex-col gap-2 relative",
                                 isMe
                                   ? "bg-indigo-600 text-white rounded-br-sm shadow-indigo-600/10"
                                   : "bg-[#1E293B] text-slate-200 rounded-bl-sm border border-slate-800/50",
                               )}
                             >
+                              {msg.replyTo && (
+                                <div
+                                  onClick={() => handleScrollToParent(msg.replyTo._id)}
+                                  className={cn(
+                                    "mb-1 p-2 rounded bg-black/10 border-l-2 cursor-pointer transition-colors hover:bg-black/20",
+                                    isMe ? "border-indigo-300" : "border-slate-500"
+                                  )}
+                                >
+                                  <p className="text-xs font-semibold opacity-80 mb-0.5">
+                                    {typeof msg.replyTo.senderId === 'object' 
+                                      ? msg.replyTo.senderId?.fullName || "User"
+                                      : activeConversation.members?.find(m => m._id === msg.replyTo.senderId)?.fullName || "User"}
+                                  </p>
+                                  <p className="text-xs opacity-70 truncate max-w-[200px] sm:max-w-[300px]">
+                                    {msg.replyTo.text || "📷 Image"}
+                                  </p>
+                                </div>
+                              )}
                               {msg.image && (
                                 <img
                                   src={msg.image}
@@ -885,6 +935,26 @@ export function ChatLayout() {
 
             {/* Input Area */}
             <div className="p-4 bg-[#111827] border-t border-slate-800/60 shrink-0">
+              {replyingToMessage && (
+                <div className="mb-2 p-3 bg-slate-800/50 border-l-4 border-indigo-500 rounded-lg flex items-center justify-between max-w-4xl mx-auto animate-fadeIn">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-indigo-400 mb-1">
+                      Replying to {getMessageSenderId(replyingToMessage) === authUser?._id 
+                        ? "yourself" 
+                        : (typeof replyingToMessage.senderId === 'object' ? replyingToMessage.senderId.fullName : activeConversation.members?.find(m => m._id === getMessageSenderId(replyingToMessage))?.fullName || "user")}
+                    </p>
+                    <p className="text-sm text-slate-300 truncate">
+                      {replyingToMessage.text || "📷 Image"}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={clearReplyingToMessage}
+                    className="p-1 ml-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               {mediaPreview && (
                 <div className="mb-3 relative w-32 h-32 rounded-lg overflow-hidden border border-slate-700 mx-auto max-w-4xl animate-fadeIn">
                   <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover" />
@@ -1253,6 +1323,15 @@ export function ChatLayout() {
         
         .animate-fadeIn {
           animation: fadeIn 0.15s ease-out forwards;
+        }
+
+        .highlight-pulse {
+          animation: pulseHighlight 2s ease-out;
+        }
+
+        @keyframes pulseHighlight {
+          0% { background-color: rgba(79, 70, 229, 0.4); }
+          100% { background-color: transparent; }
         }
       `}</style>
     </div>

@@ -21,6 +21,10 @@ const useChatStore = create((set, get) => ({
   page: 1,
   hasMore: false,
   isDeleting: false,
+  replyingToMessage: null, 
+
+  setReplyingToMessage: (message) => set({ replyingToMessage: message }),
+  clearReplyingToMessage: () => set({ replyingToMessage: null }),
 
   // Set online users (called from socketStore)
   setOnlineUsers: (users) => set({ onlineUsers: users }),
@@ -103,6 +107,11 @@ const useChatStore = create((set, get) => ({
       formData.append("convoId", activeConversation._id);
       if (text) formData.append("text", text);
       if (file) formData.append("image", file);
+      
+      const { replyingToMessage } = get();
+      if (replyingToMessage) {
+          formData.append("replyTo", replyingToMessage._id);
+      }
 
       const res = await axiosInstance.post('/message/send', formData);
       const newMessage = res.data.data;
@@ -121,6 +130,7 @@ const useChatStore = create((set, get) => ({
             : c
         ),
       });
+      set({ replyingToMessage: null });
     } catch (error) {
       console.error('Failed to send message:', error);
       toast.error('Failed to send message');

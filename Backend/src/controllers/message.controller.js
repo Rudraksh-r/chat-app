@@ -8,7 +8,7 @@ import { SOCKET_EVENTS } from "../socket/events.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 
 const sendMessage = asyncHandler(async (req, res) => {
-    const { convoId, text } = req.body;
+    const { convoId, text, replyTo } = req.body;
     const senderId = req.user._id;
 
     if (!convoId) {
@@ -35,12 +35,51 @@ const sendMessage = asyncHandler(async (req, res) => {
         imageUrl = cloudinaryResult.secure_url;
     }
 
-    const message = await Message.create({
-        convoId,
-        senderId,
+    let messageData = { 
+        convoId, 
+        senderId, 
         text: text || "",
         image: imageUrl
-    })
+    };
+
+    if (replyTo) {
+        const parentMessage = await Message.findById(replyTo);
+        // Cross-Room Verification Guard
+        if (!parentMessage || parentMessage.convoId.toString() !== convoId) {
+            throw new ApiError(400, "Invalid parent message reference provided");
+        }
+        messageData.replyTo = replyTo;
+    }
+
+    let message = await Message.create(messageData);
+
+    message = await message.populate([
+        { path: "senderId", select: "fullName avatar" },
+        { 
+            path: "replyTo", 
+            select: "text senderId",
+            // Deep Thread-Level Clamping: Only populate immediate parent details
+            populate: { path: "senderId", select: "fullName" }
+        }
+    ]);
+
+    await Conversation.findByIdAndUpdate(convoId, { lastMessage: text });
+
+    const receiverId = convoExists.members.find(
+        (member) => member.toString() !== senderId.toString()
+    );
+    
+    if (receiverId) {
+        const receiverSocketIds = getReceiverSocketIds(receiverId.toString());
+        if (receiverSocketIds.length > 0) {
+            message.status = "delivered";
+            await message.save();
+
+            receiverSocketIds.forEach((socketId) => {
+                io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_RECEIVE, message);
+            });
+        }
+    }
 
     const displayLastMessage = text || "📷 Image";
     await Conversation.findByIdAndUpdate(convoId, { lastMessage: displayLastMessage })
@@ -83,6 +122,14 @@ const getMessage = asyncHandler(async (req, res) => {
     const messages = await Message.find({ convoId, deletedFor: { $ne: req.user._id } })
         .sort({ createdAt: -1 })
         .skip(skip)
+        .populate([
+            { path: "senderId", select: "fullName avatar" },
+            {
+                path: "replyTo",
+                select: "text senderId",
+                populate: { path: "senderId", select: "fullName" }
+            }
+        ])
         .limit(limit);
 
     // Reverse them to chronological order (ascending) for display
