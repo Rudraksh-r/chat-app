@@ -18,13 +18,15 @@ const convoSchema = new Schema(
         },
         groupName: {
             type: String,
+            trim: true,
             default: ""
         },
-        groupAdmin: {
-            type: Schema.Types.ObjectId,
-            ref: "User",
-            default: null
-        },
+        groupAdmins: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: "User"
+            }
+        ],
         groupAvatar: {
             type: String,
             default: ""
@@ -32,5 +34,8 @@ const convoSchema = new Schema(
     },
     { timestamps: true }
 )
+
+convoSchema.index({ members: 1 });
+convoSchema.index({ isGroupChat: 1, updatedAt: -1 });
 
 export const Conversation = mongoose.model("Conversation", convoSchema);

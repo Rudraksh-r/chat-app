@@ -19,6 +19,11 @@ export const SOCKET_EVENTS = {
   MESSAGE_EDITED: "message:edited",    // Server → Client: message was edited
   MESSAGE_REACTION: "message:reaction",// Server → Client: message was reacted to
   
+  // Group Management
+  GROUP_MEMBER_ADDED: "group:member_added",
+  GROUP_MEMBER_REMOVED: "group:member_removed",
+  GROUP_ADMIN_PROMOTED: "group:admin_promoted",
+  GROUP_METADATA_UPDATED: "group:metadata_updated",
 
   // Typing
   TYPING_START: "typing:start",         // Client → Server → Client

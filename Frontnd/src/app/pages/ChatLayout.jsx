@@ -60,6 +60,9 @@ export function ChatLayout() {
     setReplyingToMessage,
     clearReplyingToMessage,
     sendToggleReaction,
+    removeGroupMember,
+    promoteToAdmin,
+    updateGroupMetadata,
   } = useChatStore();
   const { emitTyping, emitStopTyping, emitMessageSeen } = useSocketStore();
 
@@ -108,6 +111,10 @@ export function ChatLayout() {
   const [groupSearchResults, setGroupSearchResults] = useState([]);
   const [isGroupSearching, setIsGroupSearching] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
+  const [isEditingGroupName, setIsEditingGroupName] = useState(false);
+  const [editGroupNameText, setEditGroupNameText] = useState("");
+  const groupAvatarInputRef = useRef(null);
 
   // Handle user search inside group modal
   useEffect(() => {
@@ -561,8 +568,15 @@ export function ChatLayout() {
                   src={chatAvatar}
                   status={activeConversation.isGroupChat ? undefined : (isOtherOnline ? "online" : "offline")}
                 />
-                <div>
-                  <h2 className="font-semibold text-slate-100 text-sm sm:text-base">
+                <div 
+                  className="cursor-pointer group"
+                  onClick={() => {
+                     if (activeConversation?.isGroupChat) {
+                         setIsGroupInfoOpen(true);
+                     }
+                  }}
+                >
+                  <h2 className="font-semibold text-slate-100 text-sm sm:text-base group-hover:text-indigo-400 transition-colors">
                     {chatTitle}
                   </h2>
                   <div className="text-xs text-slate-400 flex items-center gap-1">
@@ -1363,6 +1377,170 @@ export function ChatLayout() {
                     "Create Group"
                   )}
                 </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Group Info Modal */}
+      <AnimatePresence>
+        {isGroupInfoOpen && activeConversation?.isGroupChat && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-[#1E293B] border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              <div className="p-4 sm:p-5 border-b border-slate-700/60 flex items-center justify-between bg-slate-800/30">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <span className="text-indigo-400">👥</span> Group Info
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsGroupInfoOpen(false)}
+                  className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700/50"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
+                <div className="flex flex-col items-center gap-3 mb-6">
+                   {/* Group Avatar — click to change (admin only) */}
+                   <div className="relative group/avatar">
+                     <Avatar size="xl" src={chatAvatar} className="w-20 h-20 ring-4 ring-slate-800" />
+                     {activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id) && (
+                       <>
+                         <input
+                           type="file"
+                           accept="image/*"
+                           ref={groupAvatarInputRef}
+                           className="hidden"
+                           onChange={async (e) => {
+                             const file = e.target.files?.[0];
+                             if (!file) return;
+                             if (file.size > 5 * 1024 * 1024) {
+                               toast.error("Image must be under 5MB");
+                               return;
+                             }
+                             const reader = new FileReader();
+                             reader.onloadend = () => {
+                               updateGroupMetadata(activeConversation._id, null, reader.result);
+                             };
+                             reader.readAsDataURL(file);
+                             e.target.value = "";
+                           }}
+                         />
+                         <button
+                           onClick={() => groupAvatarInputRef.current?.click()}
+                           className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                         >
+                           <Pencil className="w-4 h-4 text-white" />
+                         </button>
+                       </>
+                     )}
+                   </div>
+
+                   {/* Group Name — click to edit (admin only) */}
+                   {isEditingGroupName ? (
+                     <input
+                       autoFocus
+                       value={editGroupNameText}
+                       onChange={(e) => setEditGroupNameText(e.target.value)}
+                       onKeyDown={(e) => {
+                         if (e.key === "Enter" && editGroupNameText.trim()) {
+                           updateGroupMetadata(activeConversation._id, editGroupNameText.trim(), null);
+                           setIsEditingGroupName(false);
+                         } else if (e.key === "Escape") {
+                           setIsEditingGroupName(false);
+                         }
+                       }}
+                       onBlur={() => {
+                         if (editGroupNameText.trim() && editGroupNameText.trim() !== chatTitle) {
+                           updateGroupMetadata(activeConversation._id, editGroupNameText.trim(), null);
+                         }
+                         setIsEditingGroupName(false);
+                       }}
+                       className="text-xl font-bold text-white bg-slate-800/60 border border-indigo-500 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full max-w-[260px]"
+                     />
+                   ) : (
+                     <h3
+                       className={`text-xl font-bold text-white ${activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id) ? "cursor-pointer hover:text-indigo-400 transition-colors" : ""}`}
+                       onClick={() => {
+                         if (activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id)) {
+                           setEditGroupNameText(chatTitle);
+                           setIsEditingGroupName(true);
+                         }
+                       }}
+                       title={activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id) ? "Click to edit group name" : undefined}
+                     >
+                       {chatTitle}
+                       {activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id) && (
+                         <Pencil className="w-3 h-3 inline ml-2 text-slate-500" />
+                       )}
+                     </h3>
+                   )}
+
+                   <p className="text-sm text-slate-400">{activeConversation.members?.length} Members</p>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-2">Members</h4>
+                  {activeConversation.members?.map((member) => {
+                    const isAdmin = activeConversation.groupAdmins?.some(a => (a._id || a) === member._id);
+                    const isMe = member._id === authUser?._id;
+                    const amIAdmin = activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id);
+
+                    return (
+                      <div key={member._id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 hover:bg-slate-800/60 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <Avatar src={getAvatarUrl(member)} status={isUserOnline(member._id) ? "online" : "offline"} />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-slate-200">
+                                {member.fullName} {isMe && <span className="text-xs text-indigo-400 font-normal">(You)</span>}
+                              </p>
+                              {isAdmin && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border border-indigo-500/30">Admin</span>}
+                            </div>
+                            <p className="text-xs text-slate-500">@{member.username}</p>
+                          </div>
+                        </div>
+
+                        {/* Admin Controls */}
+                        {amIAdmin && !isMe && (
+                          <div className="flex gap-1">
+                             {!isAdmin && (
+                               <Button
+                                 size="sm"
+                                 variant="ghost"
+                                 className="h-7 text-xs text-indigo-400 hover:text-white hover:bg-indigo-500/20"
+                                 onClick={() => promoteToAdmin(activeConversation._id, member._id)}
+                               >
+                                 Promote
+                               </Button>
+                             )}
+                             <Button
+                               size="sm"
+                               variant="ghost"
+                               className="h-7 text-xs text-red-400 hover:text-white hover:bg-red-500/20"
+                               onClick={() => removeGroupMember(activeConversation._id, member._id)}
+                             >
+                               Remove
+                             </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </motion.div>
           </motion.div>

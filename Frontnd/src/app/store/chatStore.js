@@ -226,7 +226,7 @@ const useChatStore = create((set, get) => ({
   // Create a new group conversation
   createGroupConversation: async (groupName, memberIds) => {
     try {
-      const res = await axiosInstance.post('/conversation/group', { groupName, members: memberIds });
+      const res = await axiosInstance.post('/conversation/group', { name: groupName, memberIds: memberIds });
       const conversation = res.data.data;
 
       const { conversations } = get();
@@ -431,6 +431,167 @@ const useChatStore = create((set, get) => ({
       console.error('Failed to search users:', error);
       return [];
     }
+  },
+
+  // Group actions
+  removeGroupMember: async (convoId, targetUserId) => {
+    const { activeConversation, conversations } = get();
+    // Save previous state for rollback
+    const prevActiveConversation = activeConversation;
+    const prevConversations = [...conversations];
+
+    // Optimistic UI update
+    if (activeConversation && activeConversation._id === convoId) {
+       const updatedMembers = activeConversation.members.filter(m => m._id !== targetUserId);
+       const updatedAdmins = activeConversation.groupAdmins.filter(adminId => (adminId._id || adminId) !== targetUserId);
+       set({ activeConversation: { ...activeConversation, members: updatedMembers, groupAdmins: updatedAdmins } });
+    }
+
+    set({ conversations: conversations.map(c => {
+      if (c._id === convoId) {
+        return { ...c, members: c.members.filter(m => m._id !== targetUserId), groupAdmins: c.groupAdmins.filter(adminId => (adminId._id || adminId) !== targetUserId) };
+      }
+      return c;
+    })});
+
+    try {
+       await axiosInstance.patch(`/conversation/${convoId}/remove`, { targetUserId });
+       toast.success("User removed from group");
+    } catch(err) {
+       // Rollback
+       set({ activeConversation: prevActiveConversation, conversations: prevConversations });
+       toast.error("Failed to remove user");
+    }
+  },
+
+  promoteToAdmin: async (convoId, targetUserId) => {
+    const { activeConversation, conversations } = get();
+    const prevActiveConversation = activeConversation;
+    const prevConversations = [...conversations];
+
+    if (activeConversation && activeConversation._id === convoId) {
+       const updatedAdmins = [...activeConversation.groupAdmins, targetUserId];
+       set({ activeConversation: { ...activeConversation, groupAdmins: updatedAdmins } });
+    }
+
+    set({ conversations: conversations.map(c => {
+      if (c._id === convoId) {
+        return { ...c, groupAdmins: [...c.groupAdmins, targetUserId] };
+      }
+      return c;
+    })});
+
+    try {
+       await axiosInstance.patch(`/conversation/${convoId}/promote`, { targetUserId });
+       toast.success("Promoted to Admin");
+    } catch(err) {
+       set({ activeConversation: prevActiveConversation, conversations: prevConversations });
+       toast.error("Failed to promote user");
+    }
+  },
+
+  updateGroupMetadata: async (convoId, groupName, groupAvatar) => {
+    const { activeConversation, conversations } = get();
+    const prevActiveConversation = activeConversation;
+    const prevConversations = [...conversations];
+
+    const updatePayload = {};
+    if (groupName) updatePayload.groupName = groupName;
+    if (groupAvatar) updatePayload.groupAvatar = groupAvatar;
+
+    if (activeConversation && activeConversation._id === convoId) {
+       set({ activeConversation: { ...activeConversation, ...updatePayload } });
+    }
+
+    set({ conversations: conversations.map(c => {
+      if (c._id === convoId) {
+        return { ...c, ...updatePayload };
+      }
+      return c;
+    })});
+
+    try {
+       await axiosInstance.patch(`/conversation/${convoId}/metadata`, updatePayload);
+       toast.success("Group metadata updated");
+    } catch(err) {
+       set({ activeConversation: prevActiveConversation, conversations: prevConversations });
+       toast.error("Failed to update group metadata");
+    }
+  },
+
+  // Socket listener handlers
+  handleIncomingGroupMemberRemoved: ({ convoId, targetUserId }) => {
+    const { activeConversation, conversations } = get();
+    
+    // If the current user was the one removed from the group, they shouldn't see it anymore.
+    const currentUser = useAuthStore.getState().user;
+    if (currentUser && currentUser._id === targetUserId) {
+        set({ conversations: conversations.filter(c => c._id !== convoId) });
+        if (activeConversation && activeConversation._id === convoId) {
+             set({ activeConversation: null, messages: [] });
+             toast.info("You were removed from a group");
+        }
+        return;
+    }
+
+    if (activeConversation && activeConversation._id === convoId) {
+       const updatedMembers = activeConversation.members.filter(m => m._id !== targetUserId);
+       const updatedAdmins = activeConversation.groupAdmins.filter(adminId => (adminId._id || adminId) !== targetUserId);
+       set({ activeConversation: { ...activeConversation, members: updatedMembers, groupAdmins: updatedAdmins } });
+    }
+
+    set({ conversations: conversations.map(c => {
+      if (c._id === convoId) {
+        return { ...c, members: c.members.filter(m => m._id !== targetUserId), groupAdmins: c.groupAdmins.filter(adminId => (adminId._id || adminId) !== targetUserId) };
+      }
+      return c;
+    })});
+  },
+
+  handleIncomingGroupMemberAdded: ({ convoId, updatedGroup }) => {
+     const { activeConversation, conversations } = get();
+     if (activeConversation && activeConversation._id === convoId) {
+        set({ activeConversation: { ...activeConversation, members: updatedGroup.members, groupAdmins: updatedGroup.groupAdmins } });
+     }
+
+     set({ conversations: conversations.map(c => {
+       if (c._id === convoId) {
+         return { ...c, members: updatedGroup.members, groupAdmins: updatedGroup.groupAdmins };
+       }
+       return c;
+     })});
+  },
+
+  handleIncomingGroupAdminPromoted: ({ convoId, targetUserId }) => {
+     const { activeConversation, conversations } = get();
+     if (activeConversation && activeConversation._id === convoId) {
+        if (!activeConversation.groupAdmins.some(a => (a._id || a) === targetUserId)) {
+            const updatedAdmins = [...activeConversation.groupAdmins, targetUserId];
+            set({ activeConversation: { ...activeConversation, groupAdmins: updatedAdmins } });
+        }
+     }
+     
+     set({ conversations: conversations.map(c => {
+       if (c._id === convoId) {
+           if (!c.groupAdmins.some(a => (a._id || a) === targetUserId)) {
+              return { ...c, groupAdmins: [...c.groupAdmins, targetUserId] };
+           }
+       }
+       return c;
+     })});
+  },
+
+  handleIncomingGroupMetadataUpdated: ({ convoId, updatePayload }) => {
+     const { activeConversation, conversations } = get();
+     if (activeConversation && activeConversation._id === convoId) {
+        set({ activeConversation: { ...activeConversation, groupName: updatePayload.groupName || activeConversation.groupName, groupAvatar: updatePayload.groupAvatar || activeConversation.groupAvatar } });
+     }
+     set({ conversations: conversations.map(c => {
+       if (c._id === convoId) {
+           return { ...c, groupName: updatePayload.groupName || c.groupName, groupAvatar: updatePayload.groupAvatar || c.groupAvatar };
+       }
+       return c;
+     })});
   },
 
   // Clear chat state (on logout)

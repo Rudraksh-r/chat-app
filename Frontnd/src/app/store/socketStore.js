@@ -14,6 +14,12 @@ const SOCKET_EVENTS = {
   ERROR: "socket:error",
   MESSAGE_DELETED: "message:deleted",
   MESSAGE_REACTION: "message:reaction",
+  
+  // Group Management
+  GROUP_MEMBER_ADDED: "group:member_added",
+  GROUP_MEMBER_REMOVED: "group:member_removed",
+  GROUP_ADMIN_PROMOTED: "group:admin_promoted",
+  GROUP_METADATA_UPDATED: "group:metadata_updated",
 };
 
 const useSocketStore = create((set, get) => ({
@@ -76,6 +82,31 @@ const useSocketStore = create((set, get) => ({
 
     newSocket.on(SOCKET_EVENTS.MESSAGE_REACTION, (payload) => {
       useChatStore.getState().updateIncomingReaction(payload);
+    });
+
+    // Group events
+    newSocket.on(SOCKET_EVENTS.GROUP_MEMBER_ADDED, (payload) => {
+      if (useChatStore.getState().handleIncomingGroupMemberAdded) {
+        useChatStore.getState().handleIncomingGroupMemberAdded(payload);
+      }
+    });
+
+    newSocket.on(SOCKET_EVENTS.GROUP_MEMBER_REMOVED, (payload) => {
+      if (useChatStore.getState().handleIncomingGroupMemberRemoved) {
+        useChatStore.getState().handleIncomingGroupMemberRemoved(payload);
+      }
+    });
+
+    newSocket.on(SOCKET_EVENTS.GROUP_ADMIN_PROMOTED, (payload) => {
+      if (useChatStore.getState().handleIncomingGroupAdminPromoted) {
+        useChatStore.getState().handleIncomingGroupAdminPromoted(payload);
+      }
+    });
+
+    newSocket.on(SOCKET_EVENTS.GROUP_METADATA_UPDATED, (payload) => {
+      if (useChatStore.getState().handleIncomingGroupMetadataUpdated) {
+        useChatStore.getState().handleIncomingGroupMetadataUpdated(payload);
+      }
     });
 
     set({ socket: newSocket });
