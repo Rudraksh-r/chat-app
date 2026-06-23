@@ -16,7 +16,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     }
 
     if (!text && !req.file) {
-        throw new ApiError(400, "Message must contain either text or an image")
+        throw new ApiError(400, "Message must contain either text or a file")
     }
 
     const convoExists = await Conversation.findById(convoId)
@@ -24,22 +24,58 @@ const sendMessage = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Conversation not found")
     }
 
+    // ── Multi-format upload pipeline ─────────────────────────────
     let imageUrl = "";
+    let documentData = {};
+    let audioData = {};
+
     if (req.file) {
-        // Upload image to Cloudinary
-        const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
-            folder: "chat_app/chat_images",
-            // Override the avatar face-cropping transformation
-            transformation: [{ quality: "auto", fetch_format: "auto" }]
-        });
-        imageUrl = cloudinaryResult.secure_url;
+        const mime = req.file.mimetype;
+
+        if (mime.startsWith("image/")) {
+            // Image upload
+            const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+                folder: "chat_app/images",
+                resource_type: "image",
+                transformation: [{ quality: "auto", fetch_format: "auto" }]
+            });
+            imageUrl = cloudinaryResult.secure_url;
+
+        } else if (mime.startsWith("audio/")) {
+            // Audio upload — Cloudinary treats audio under resource_type "video"
+            const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+                folder: "chat_app/audio",
+                resource_type: "video",
+                transformation: [],
+            });
+            audioData = {
+                url: cloudinaryResult.secure_url,
+                name: req.file.originalname,
+                duration: cloudinaryResult.duration || 0,
+            };
+
+        } else {
+            // Document upload (PDF, DOC, TXT, etc.) — resource_type "raw"
+            const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+                folder: "chat_app/documents",
+                resource_type: "raw",
+                transformation: [],
+            });
+            documentData = {
+                url: cloudinaryResult.secure_url,
+                name: req.file.originalname,
+                size: req.file.size,
+            };
+        }
     }
 
-    let messageData = { 
-        convoId, 
-        senderId, 
+    let messageData = {
+        convoId,
+        senderId,
         text: text || "",
-        image: imageUrl
+        image: imageUrl,
+        ...(audioData.url && { audio: audioData }),
+        ...(documentData.url && { document: documentData }),
     };
 
     if (replyTo) {
@@ -55,9 +91,9 @@ const sendMessage = asyncHandler(async (req, res) => {
 
     message = await message.populate([
         { path: "senderId", select: "fullName avatar" },
-        { 
-            path: "replyTo", 
-            select: "text senderId",
+        {
+            path: "replyTo",
+            select: "text senderId image document audio",
             // Deep Thread-Level Clamping: Only populate immediate parent details
             populate: { path: "senderId", select: "fullName" }
         }
@@ -68,7 +104,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     const receiverId = convoExists.members.find(
         (member) => member.toString() !== senderId.toString()
     );
-    
+
     if (receiverId) {
         const receiverSocketIds = getReceiverSocketIds(receiverId.toString());
         if (receiverSocketIds.length > 0) {
@@ -81,7 +117,13 @@ const sendMessage = asyncHandler(async (req, res) => {
         }
     }
 
-    const displayLastMessage = text || "📷 Image";
+    // Determine sidebar preview text based on media type
+    let displayLastMessage = text;
+    if (!displayLastMessage) {
+        if (imageUrl)        displayLastMessage = "📷 Image";
+        else if (audioData.url)    displayLastMessage = "🎵 Audio";
+        else if (documentData.url) displayLastMessage = "📎 Document";
+    }
     await Conversation.findByIdAndUpdate(convoId, { lastMessage: displayLastMessage })
 
     // Broadcast to ALL other members of the conversation
@@ -243,16 +285,16 @@ const editMessage = asyncHandler(async (req, res) => {
     const userId = req.user._id
     const { text } = req.body
 
-    if (!text|| text.trim() == ""){
+    if (!text || text.trim() == "") {
         throw new ApiError(400, "Updated text context cannot be blank")
     }
 
     const message = await Message.findById(messageId);
-    if (!message){
+    if (!message) {
         throw new ApiError(404, "Message not found")
     }
 
-    if(message.senderId.toString() != userId.toString()){
+    if (message.senderId.toString() != userId.toString()) {
         throw new ApiError(403, "You are not authorized to edit this message")
     }
 
@@ -268,8 +310,8 @@ const editMessage = asyncHandler(async (req, res) => {
 
     // Update sidebar context
     const conversation = await Conversation.findById(message.convoId);
-    if(conversation) {
-        const lastSavedMsg = await Message.findOne({ConvoId: message.convoId}).sort({createdAt: -1})
+    if (conversation) {
+        const lastSavedMsg = await Message.findOne({ ConvoId: message.convoId }).sort({ createdAt: -1 })
         if (lastSavedMsg && lastSavedMsg._id.toString() === message._id.toString()) {
             conversation.lastMessage = text;
             await conversation.save();
@@ -277,10 +319,10 @@ const editMessage = asyncHandler(async (req, res) => {
     }
 
     // Broadcast Real-time event to all relevant conversation members
-    if(conversation){
-        conversation.members.forEach((memberId)=> {
+    if (conversation) {
+        conversation.members.forEach((memberId) => {
             const clientSockets = getReceiverSocketIds(memberId.toString());
-            clientSockets.forEach((socketId)=>{
+            clientSockets.forEach((socketId) => {
                 io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_EDITED, message
                 );
             })
@@ -288,8 +330,8 @@ const editMessage = asyncHandler(async (req, res) => {
     }
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, message, "Message edited successfully"))
+        .status(200)
+        .json(new ApiResponse(200, message, "Message edited successfully"))
 });
 
 // Rate limiting map for reactions
@@ -346,7 +388,7 @@ const toggleReaction = asyncHandler(async (req, res) => {
         // Add new reaction
         message.reactions.push({ userId, emoji });
     }
-    
+
     const updatedMessage = await message.save();
 
     // Real-Time Propagation via Active Socket Matrix Channels

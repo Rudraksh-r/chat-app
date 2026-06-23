@@ -5,7 +5,7 @@ import { upload } from "../middleware/multer.middleware.js";
 
 const router = express.Router();
 
-router.post("/send", verifyJWT, upload.single("image"), sendMessage)
+router.post("/send", verifyJWT, upload.single("file"), sendMessage)
 router.get("/:convoId", verifyJWT, getMessage)
 router.patch("/:id/delete", verifyJWT, deleteMessage);
 router.patch("/:id/delete-for-everyone", verifyJWT, deleteForEveryone);

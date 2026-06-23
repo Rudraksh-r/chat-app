@@ -23,6 +23,9 @@ import {
   Trash2,
   Pencil,
   CornerUpLeft,
+  FileText,
+  Music,
+  Download,
 } from "lucide-react";
 import { formatTime, formatTimeAgo, cn } from "../lib/utils";
 import { Button, Avatar } from "../components/ui/index";
@@ -92,6 +95,7 @@ export function ChatLayout() {
   }, []);
   const [messageText, setMessageText] = useState("");
   const [mediaPreview, setMediaPreview] = useState("");
+  const [mediaPreviewType, setMediaPreviewType] = useState(null); // "image" | "audio" | "document"
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedImageModal, setSelectedImageModal] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -232,24 +236,37 @@ export function ChatLayout() {
     }
   };
 
-  const handleImageChange = (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Production check: Validate size (e.g., max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5MB");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10MB");
       return;
     }
 
     setSelectedFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setMediaPreview(reader.result);
-    reader.readAsDataURL(file);
+
+    if (file.type.startsWith("image/")) {
+      setMediaPreviewType("image");
+      const objectUrl = URL.createObjectURL(file);
+      setMediaPreview(objectUrl);
+    } else if (file.type.startsWith("audio/")) {
+      setMediaPreviewType("audio");
+      setMediaPreview(file.name);
+    } else {
+      setMediaPreviewType("document");
+      setMediaPreview(file.name);
+    }
   };
 
   const removefile = () => {
+    // Revoke object URL to prevent memory leaks
+    if (mediaPreviewType === "image" && mediaPreview && mediaPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(mediaPreview);
+    }
     setMediaPreview(null);
+    setMediaPreviewType(null);
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -781,7 +798,7 @@ export function ChatLayout() {
                                       : activeConversation.members?.find(m => m._id === msg.replyTo.senderId)?.fullName || "User"}
                                   </p>
                                   <p className="text-xs opacity-70 truncate max-w-[200px] sm:max-w-[300px]">
-                                    {msg.replyTo.text || "📷 Image"}
+                                    {msg.replyTo.text || (msg.replyTo.image ? "📷 Image" : msg.replyTo.audio?.url ? "🎵 Audio" : msg.replyTo.document?.url ? "📎 Document" : "Attachment")}
                                   </p>
                                 </div>
                               )}
@@ -792,6 +809,58 @@ export function ChatLayout() {
                                   className="sm:max-w-[200px] rounded-md object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                   onClick={() => setSelectedImageModal(msg.image)}
                                 />
+                              )}
+                              {msg.audio?.url && (
+                                <div className="flex flex-col gap-1.5 min-w-[220px] max-w-[280px]">
+                                  <div className="flex items-center gap-2 text-xs opacity-70">
+                                    <Music className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate">{msg.audio.name || "Audio"}</span>
+                                  </div>
+                                  <audio
+                                    controls
+                                    preload="metadata"
+                                    className="w-full h-8 rounded-lg"
+                                    style={{ filter: isMe ? "invert(1) hue-rotate(180deg) brightness(0.85)" : "invert(1) hue-rotate(180deg) brightness(0.7)" }}
+                                  >
+                                    <source src={msg.audio.url} />
+                                    Your browser does not support audio playback.
+                                  </audio>
+                                </div>
+                              )}
+                              {msg.document?.url && (
+                                <a
+                                  href={msg.document.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={cn(
+                                    "flex items-center gap-3 px-3 py-2.5 rounded-xl min-w-[200px] max-w-[280px] transition-colors group/doc",
+                                    isMe
+                                      ? "bg-indigo-700/40 hover:bg-indigo-700/60"
+                                      : "bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/40"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                                    isMe ? "bg-indigo-500/30" : "bg-indigo-500/20"
+                                  )}>
+                                    <FileText className="w-5 h-5 text-indigo-300" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {msg.document.name || "Document"}
+                                    </p>
+                                    {msg.document.size > 0 && (
+                                      <p className="text-[11px] opacity-60">
+                                        {msg.document.size < 1024
+                                          ? `${msg.document.size} B`
+                                          : msg.document.size < 1024 * 1024
+                                            ? `${(msg.document.size / 1024).toFixed(1)} KB`
+                                            : `${(msg.document.size / (1024 * 1024)).toFixed(1)} MB`}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Download className="w-4 h-4 opacity-40 group-hover/doc:opacity-100 transition-opacity shrink-0" />
+                                </a>
                               )}
                               {msg.deletedForEveryone ? (
                                  <div className="text-sm italic text-slate-400">Message deleted</div>
@@ -1012,7 +1081,7 @@ export function ChatLayout() {
                         : (typeof replyingToMessage.senderId === 'object' ? replyingToMessage.senderId.fullName : activeConversation.members?.find(m => m._id === getMessageSenderId(replyingToMessage))?.fullName || "user")}
                     </p>
                     <p className="text-sm text-slate-300 truncate">
-                      {replyingToMessage.text || "📷 Image"}
+                      {replyingToMessage.text || (replyingToMessage.image ? "📷 Image" : replyingToMessage.audio?.url ? "🎵 Audio" : replyingToMessage.document?.url ? "📎 Document" : "Attachment")}
                     </p>
                   </div>
                   <button 
@@ -1024,15 +1093,48 @@ export function ChatLayout() {
                 </div>
               )}
               {mediaPreview && (
-                <div className="mb-3 relative w-32 h-32 rounded-lg overflow-hidden border border-slate-700 mx-auto max-w-4xl animate-fadeIn">
-                  <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover" />
-                  <button 
-                    onClick={removefile}
-                    type="button"
-                    className="absolute top-1 right-1 w-6 h-6 bg-slate-900/80 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                <div className="mb-3 mx-auto max-w-4xl animate-fadeIn">
+                  {mediaPreviewType === "image" ? (
+                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-700 mx-auto">
+                      <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button 
+                        onClick={removefile}
+                        type="button"
+                        className="absolute top-1 right-1 w-6 h-6 bg-slate-900/80 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-slate-800/60 border border-slate-700/50 rounded-xl max-w-xs mx-auto">
+                      <div className={cn(
+                        "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                        mediaPreviewType === "audio" ? "bg-emerald-500/20" : "bg-indigo-500/20"
+                      )}>
+                        {mediaPreviewType === "audio" 
+                          ? <Music className="w-5 h-5 text-emerald-400" />
+                          : <FileText className="w-5 h-5 text-indigo-400" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-200 font-medium truncate">{mediaPreview}</p>
+                        <p className="text-[11px] text-slate-500">
+                          {selectedFile && (
+                            selectedFile.size < 1024 * 1024
+                              ? `${(selectedFile.size / 1024).toFixed(1)} KB`
+                              : `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`
+                          )}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={removefile}
+                        type="button"
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               <form
@@ -1041,10 +1143,10 @@ export function ChatLayout() {
               >
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,audio/*,.pdf,.doc,.docx,.txt"
                   className="hidden"
                   ref={fileInputRef}
-                  onChange={handleImageChange}
+                  onChange={handleFileChange}
                 />
                 <Button
                   type="button"

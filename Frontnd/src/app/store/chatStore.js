@@ -106,7 +106,7 @@ const useChatStore = create((set, get) => ({
       const formData = new FormData();
       formData.append("convoId", activeConversation._id);
       if (text) formData.append("text", text);
-      if (file) formData.append("image", file);
+      if (file) formData.append("file", file);
       
       const { replyingToMessage } = get();
       if (replyingToMessage) {
@@ -121,7 +121,7 @@ const useChatStore = create((set, get) => ({
 
       // Update the conversation's lastMessage in the sidebar
 
-      const sidebarMessageText = newMessage.image ? (newMessage.text || "📷 Image") : newMessage.text;
+      const sidebarMessageText = newMessage.text || (newMessage.image ? "📷 Image" : newMessage.audio?.url ? "🎵 Audio" : newMessage.document?.url ? "📎 Document" : "");
 
       set({
         conversations: get().conversations.map(c =>
@@ -163,7 +163,7 @@ const useChatStore = create((set, get) => ({
       const sender = convo?.members.find(m => m._id === message.senderId);
       const senderName = sender?.fullName || "Someone";
 
-      const previewText = message.image ? "📷 Image" : message.text;
+      const previewText = message.text || (message.image ? "📷 Image" : message.audio?.url ? "🎵 Audio" : message.document?.url ? "📎 Document" : "New message");
       toast(`New message from ${senderName}`, { description: previewText });
 
       set({
@@ -175,7 +175,7 @@ const useChatStore = create((set, get) => ({
     }
 
     // Update sidebar lastMessage for the relevant conversation
-    const sidebarMessageText = message.image ? (message.text || "📷 Image") : message.text;
+    const sidebarMessageText = message.text || (message.image ? "📷 Image" : message.audio?.url ? "🎵 Audio" : message.document?.url ? "📎 Document" : "");
 
     set({
       conversations: currentConversations.map(c =>
@@ -310,7 +310,7 @@ const useChatStore = create((set, get) => ({
     if (activeConversation && activeConversation._id === convoId) {
       if (permanently) {
         newMessages = messages.map((msg) =>
-          msg._id === messageId ? { ...msg, deletedForEveryone: true, text: "Message deleted", image: null } : msg
+          msg._id === messageId ? { ...msg, deletedForEveryone: true, text: "Message deleted", image: null, document: null, audio: null } : msg
         );
       } else {
         newMessages = messages.filter((msg) => msg._id !== messageId);
@@ -326,7 +326,7 @@ const useChatStore = create((set, get) => ({
           if (activeConversation && activeConversation._id === convoId) {
             if (newMessages.length > 0) {
               const lastMsg = newMessages[newMessages.length - 1];
-              sidebarMessageText = lastMsg.deletedForEveryone ? "Message deleted" : (lastMsg.image ? (lastMsg.text || "📷 Image") : lastMsg.text);
+              sidebarMessageText = lastMsg.deletedForEveryone ? "Message deleted" : (lastMsg.text || (lastMsg.image ? "📷 Image" : lastMsg.audio?.url ? "🎵 Audio" : lastMsg.document?.url ? "📎 Document" : ""));
             } else {
               sidebarMessageText = "No messages yet";
             }

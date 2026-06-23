@@ -12,11 +12,22 @@ const messageSchema = new Schema({
     },
     text: {
         type: String,
+        required: false,
         default: "",
     },
     image: {
         type: String,
         default: "",
+    },
+    document: {
+        url:  { type: String, default: "" },
+        name: { type: String, default: "" },
+        size: { type: Number, default: 0 },
+    },
+    audio: {
+        url:  { type: String, default: "" },
+        name: { type: String, default: "" },
+        duration: { type: Number, default: 0 },
     },
     status: {
         type: String,
