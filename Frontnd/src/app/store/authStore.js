@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import useSocketStore from './socketStore';
 import useChatStore from './chatStore';
 
-const useAuthStore = create((set, get) => ({
+const useAuthStore = create((set) => ({
   // State
   authUser: null,
   isLoading: false,
@@ -74,7 +74,7 @@ const useAuthStore = create((set, get) => ({
       useChatStore.getState().clearChat();
       set({ authUser: null });
       toast.success('Logged out successfully');
-    } catch (error) {
+    } catch {
       toast.error('Logout failed');
     }
   },

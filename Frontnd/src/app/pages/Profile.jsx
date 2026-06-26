@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router";
-import { motion } from "framer-motion";
+import { motion as Motion } from "framer-motion";
 import { User, Mail, Lock, Camera, ArrowLeft, Save, LogOut, Loader2 } from "lucide-react";
 import { Button, Input, Avatar } from "../components/ui/index";
 import { toast } from "sonner";
@@ -14,7 +14,6 @@ export function Profile() {
   const [fullName, setFullName] = useState(authUser?.fullName || "");
   const [username, setUsername] = useState(authUser?.username || "");
   const [email] = useState(authUser?.email || "");
-  const [password, setPassword] = useState("••••••••");
   // Local preview URL — shows the new image immediately before
   // the upload finishes, making the UI feel instant.
   const [avatarPreview, setAvatarPreview] = useState(null);
@@ -23,13 +22,6 @@ export function Profile() {
   // user clicks the avatar overlay. This gives us full control
   // over the visual design without using a default file input.
   const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    if (authUser) {
-      setFullName(authUser.fullName || "");
-      setUsername(authUser.username || "");
-    }
-  }, [authUser]);
 
   // Handler called when user picks a file
   const handleAvatarChange = async (e) => {
@@ -46,6 +38,7 @@ export function Profile() {
       return;
     }
 
+    setAvatarPreview(URL.createObjectURL(file));
     await updateAvatar(file);
   };
 
@@ -68,7 +61,7 @@ export function Profile() {
     <div className="min-h-screen w-full bg-[#0F172A] flex justify-center p-4 py-8 sm:py-12">
       <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-2xl bg-[#111827] rounded-3xl shadow-2xl shadow-indigo-500/5 border border-slate-800/50 z-10 flex flex-col overflow-hidden"
@@ -92,7 +85,7 @@ export function Profile() {
           {/* Avatar Section */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-10">
             <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
-              <Avatar src={avatarPreview || getAvatarUrl(authUser)} size="xl" />
+              <Avatar src={displayAvatar} size="xl" />
               <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity border-2 border-indigo-500">
                 {isLoading ? (
                   <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -192,7 +185,7 @@ export function Profile() {
             {isLoading ? "Saving..." : "Save Changes"}
           </Button>
         </div>
-      </motion.div>
+      </Motion.div>
     </div>
   );
 }

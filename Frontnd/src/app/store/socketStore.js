@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { io } from 'socket.io-client';
 import useChatStore from './chatStore';
 
-const SOCKET_URL = 'http://localhost:5001';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
 
 // Phase 2.5 #10: Mirror backend event names on the frontend
 const SOCKET_EVENTS = {
@@ -13,6 +13,7 @@ const SOCKET_EVENTS = {
   TYPING_STOP: "typing:stop",
   ERROR: "socket:error",
   MESSAGE_DELETED: "message:deleted",
+  MESSAGE_EDITED: "message:edited",
   MESSAGE_REACTION: "message:reaction",
   
   // Group Management
@@ -27,7 +28,7 @@ const useSocketStore = create((set, get) => ({
 
   // Connect to Socket.IO server after login
   // Phase 2.5 #9: No longer passes userId in query — uses cookie auth instead
-  connectSocket: (userId) => {
+  connectSocket: () => {
     const { socket } = get();
     if (socket?.connected) return;
 
@@ -82,6 +83,10 @@ const useSocketStore = create((set, get) => ({
 
     newSocket.on(SOCKET_EVENTS.MESSAGE_REACTION, (payload) => {
       useChatStore.getState().updateIncomingReaction(payload);
+    });
+
+    newSocket.on(SOCKET_EVENTS.MESSAGE_EDITED, (message) => {
+      useChatStore.getState().updateIncomingEditMessage(message);
     });
 
     // Group events

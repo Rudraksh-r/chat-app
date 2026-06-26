@@ -1,7 +1,7 @@
 import { getAvatarUrl } from "../lib/avatar";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import {
   Search,
@@ -106,6 +106,7 @@ export function ChatLayout() {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const [currentTime, setCurrentTime] = useState(0);
 
   // Group creation modal state
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
@@ -119,6 +120,16 @@ export function ChatLayout() {
   const [isEditingGroupName, setIsEditingGroupName] = useState(false);
   const [editGroupNameText, setEditGroupNameText] = useState("");
   const groupAvatarInputRef = useRef(null);
+
+  useEffect(() => {
+    const updateCurrentTime = () => setCurrentTime(Date.now());
+    const timeoutId = setTimeout(updateCurrentTime, 0);
+    const intervalId = setInterval(updateCurrentTime, 30000);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+    };
+  }, []);
 
   // Handle user search inside group modal
   useEffect(() => {
@@ -372,7 +383,7 @@ export function ChatLayout() {
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {!sidebarOpen && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -383,7 +394,7 @@ export function ChatLayout() {
       </AnimatePresence>
 
       {/* Sidebar */}
-      <motion.div
+      <Motion.div
         className={cn(
           "fixed md:relative z-50 flex flex-col w-80 h-full bg-[#111827] border-r border-slate-800/60 shrink-0 transition-transform duration-300 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
@@ -564,7 +575,7 @@ export function ChatLayout() {
             </div>
           )}
         </div>
-      </motion.div>
+      </Motion.div>
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#0F172A] relative">
@@ -653,7 +664,7 @@ export function ChatLayout() {
                     const sender = activeConversation.members?.find((m) => m._id === senderIdStr);
 
                     return (
-                        <motion.div
+                        <Motion.div
                           id={msg._id}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -669,7 +680,7 @@ export function ChatLayout() {
                         >
                           <AnimatePresence>
                             {contextMenuMsgId === msg._id && (
-                              <motion.div
+                              <Motion.div
                                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -691,8 +702,9 @@ export function ChatLayout() {
                                   Delete for me
                                 </button>
                                 
-                                {msg.senderId === authUser?._id && 
-                                 (Date.now() - new Date(msg.createdAt).getTime() < 15 * 60 * 1000) && (
+                                {getMessageSenderId(msg) === authUser?._id && 
+                                 currentTime > 0 &&
+                                 (currentTime - new Date(msg.createdAt).getTime() < 15 * 60 * 1000) && (
                                   <button
                                     onClick={() => {
                                       setEditingMessageId(msg._id);
@@ -717,8 +729,9 @@ export function ChatLayout() {
                                   Reply
                                 </button>
 
-                                {msg.senderId === authUser?._id && 
-                                 (Date.now() - new Date(msg.createdAt).getTime() < 60 * 60 * 1000) && (
+                                {getMessageSenderId(msg) === authUser?._id && 
+                                 currentTime > 0 &&
+                                 (currentTime - new Date(msg.createdAt).getTime() < 60 * 60 * 1000) && (
                                   <button
                                     onClick={() => {
                                       deleteMessageForEveryone(msg._id);
@@ -730,7 +743,7 @@ export function ChatLayout() {
                                     Delete for everyone
                                   </button>
                                 )}
-                              </motion.div>
+                              </Motion.div>
                             )}
                           </AnimatePresence>
                         <div
@@ -965,7 +978,7 @@ export function ChatLayout() {
                             </div>
                           </div>
                         </div>
-                      </motion.div>
+                      </Motion.div>
                     );
                   })}
                 </>
@@ -992,7 +1005,7 @@ export function ChatLayout() {
                             <div className="flex flex-col">
                               <span className="text-[10px] text-slate-500 ml-1 mb-0.5">{user.fullName}</span>
                               <div className="px-4 py-2.5 rounded-2xl bg-[#1E293B] text-slate-200 rounded-bl-sm border border-slate-800/50 flex items-center gap-1.5 h-9">
-                                <motion.div
+                                <Motion.div
                                   animate={{ y: [0, -3, 0] }}
                                   transition={{
                                     repeat: Infinity,
@@ -1001,7 +1014,7 @@ export function ChatLayout() {
                                   }}
                                   className="w-1.5 h-1.5 bg-slate-400 rounded-full"
                                 />
-                                <motion.div
+                                <Motion.div
                                   animate={{ y: [0, -3, 0] }}
                                   transition={{
                                     repeat: Infinity,
@@ -1010,7 +1023,7 @@ export function ChatLayout() {
                                   }}
                                   className="w-1.5 h-1.5 bg-slate-400 rounded-full"
                                 />
-                                <motion.div
+                                <Motion.div
                                   animate={{ y: [0, -3, 0] }}
                                   transition={{
                                     repeat: Infinity,
@@ -1033,7 +1046,7 @@ export function ChatLayout() {
                           <Avatar src={chatAvatar} size="sm" />
                         </div>
                         <div className="px-4 py-3.5 rounded-2xl bg-[#1E293B] text-slate-200 rounded-bl-sm border border-slate-800/50 flex items-center gap-1.5 h-11">
-                          <motion.div
+                          <Motion.div
                             animate={{ y: [0, -3, 0] }}
                             transition={{
                               repeat: Infinity,
@@ -1042,7 +1055,7 @@ export function ChatLayout() {
                             }}
                             className="w-1.5 h-1.5 bg-slate-400 rounded-full"
                           />
-                          <motion.div
+                          <Motion.div
                             animate={{ y: [0, -3, 0] }}
                             transition={{
                               repeat: Infinity,
@@ -1051,7 +1064,7 @@ export function ChatLayout() {
                             }}
                             className="w-1.5 h-1.5 bg-slate-400 rounded-full"
                           />
-                          <motion.div
+                          <Motion.div
                             animate={{ y: [0, -3, 0] }}
                             transition={{
                               repeat: Infinity,
@@ -1244,7 +1257,7 @@ export function ChatLayout() {
       {/* Image Modal */}
       <AnimatePresence>
         {selectedImageModal && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1260,7 +1273,7 @@ export function ChatLayout() {
               >
                 <X className="w-6 h-6" />
               </Button>
-              <motion.img
+              <Motion.img
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.95 }}
@@ -1270,14 +1283,14 @@ export function ChatLayout() {
                 onClick={(e) => e.stopPropagation()} 
               />
             </div>
-          </motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
 
       {/* Create Group Modal */}
       <AnimatePresence>
         {isCreateGroupOpen && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1289,7 +1302,7 @@ export function ChatLayout() {
               setGroupSearchQuery("");
             }}
           >
-            <motion.div
+            <Motion.div
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
@@ -1480,21 +1493,21 @@ export function ChatLayout() {
                   )}
                 </Button>
               </div>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
 
       {/* Group Info Modal */}
       <AnimatePresence>
         {isGroupInfoOpen && activeConversation?.isGroupChat && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
           >
-            <motion.div
+            <Motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -1644,8 +1657,8 @@ export function ChatLayout() {
                   })}
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
       <style jsx>{`
@@ -1684,3 +1697,4 @@ export function ChatLayout() {
     </div>
   );
 }
+

@@ -61,7 +61,14 @@ const updateAvatar = asyncHandler(async (req, res) => {
   // Save the secure URL to the user's profile
   const user = await User.findByIdAndUpdate(
     req.user._id,
-    { $set: { avatar: cloudinaryResult.secure_url } },
+    {
+      $set: {
+        avatar: {
+          url: cloudinaryResult.secure_url,
+          public_id: cloudinaryResult.public_id || "",
+        },
+      },
+    },
     { new: true }
   ).select("-password -refreshToken");
 

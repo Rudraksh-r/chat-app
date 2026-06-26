@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import axiosInstance, { deleteMessageForEveryone as deleteMessageForEveryoneAPI, deleteMessageForMe as deleteMessageForMeAPI } from '../lib/axios';
 import { toast } from 'sonner';
 import useAuthStore from './authStore';
-import { convertBoundingBoxToBox, updateMotionValuesFromProps } from 'framer-motion';
 
+const getEntityId = (entity) => entity?._id || entity;
 
 
 const useChatStore = create((set, get) => ({
@@ -270,7 +270,7 @@ const useChatStore = create((set, get) => ({
     set({ isDeleting: true });
     try {
       await axiosInstance.patch(`/message/${messageId}/delete`);
-      toast.success('Message deleted for everyone');
+      toast.success('Message deleted for you');
     } catch (error) {
       console.error('Failed to delete message:', error);
       toast.error('Failed to delete message');
@@ -352,13 +352,16 @@ const useChatStore = create((set, get) => ({
       );
       set({ messages: updatedMessages });
 
-      // Synchronize Sidebar list view item reference instantly
-      const updatedConversations = get().conversations.map((c) =>
-        c._id === updatedMessage.convoId
-        ? {...c, lastMessage: newText, updatedAt: new Date().toISOString()}
-        : c
-      );
-      set({conversations: updatedConversations});
+      const lastMessage = updatedMessages[updatedMessages.length - 1];
+      if (lastMessage?._id === messageId) {
+        // Synchronize Sidebar list view item reference instantly
+        const updatedConversations = get().conversations.map((c) =>
+          c._id === updatedMessage.convoId
+            ? { ...c, lastMessage: newText, updatedAt: new Date().toISOString() }
+            : c
+        );
+        set({ conversations: updatedConversations });
+      }
       return true;
     } catch (error) {
       console.error("Failed executing edit payload", error);
@@ -368,27 +371,28 @@ const useChatStore = create((set, get) => ({
   },
   // Real-time Event Receiver Handler invoked via socket connection mapping
   updateIncomingEditMessage: (editedMessage) => {
-    const {activeConversation, messages, setMessages, conversations, setConversations} = get();
-    const {messageId, text, updatedAt} = editedMessage;
+    const { activeConversation, messages, conversations } = get();
+    const messageId = getEntityId(editedMessage) || editedMessage.messageId;
 
     // If the message belongs to the currently active conversation (the one open in chat window)
-    if(activeConversation && activeConversation._id === editedMessage.convoId) {
+    if (activeConversation && activeConversation._id === editedMessage.convoId) {
       // Update the message in the messages array
-      setMessages(prev => prev.map(msg => 
-        msg._id === messageId
-        ? editedMessage
-        : msg
-      ));
+      set({
+        messages: messages.map((msg) =>
+          msg._id === messageId ? editedMessage : msg
+        ),
+      });
     }
 
-    // Also update the conversation's last message preview if it was an incoming message
-    if(activeConversation && activeConversation._id === editedMessage.convoId && editedMessage.senderId !== useAuthStore.getState().user._id) {
-      setConversations(prev => prev.map(c => 
-        c._id === editedMessage.convoId
-        ? {...c, lastMessage: editedMessage.text, updatedAt: editedMessage.updatedAt}
-        : c
-      ));
-      set({conversations: setConversations})
+    const lastMessage = messages[messages.length - 1];
+    if (activeConversation?._id === editedMessage.convoId && lastMessage?._id === messageId) {
+      set({
+        conversations: conversations.map((c) =>
+          c._id === editedMessage.convoId
+            ? { ...c, lastMessage: editedMessage.text, updatedAt: editedMessage.updatedAt }
+            : c
+        ),
+      });
     }
   },
 
@@ -443,13 +447,13 @@ const useChatStore = create((set, get) => ({
     // Optimistic UI update
     if (activeConversation && activeConversation._id === convoId) {
        const updatedMembers = activeConversation.members.filter(m => m._id !== targetUserId);
-       const updatedAdmins = activeConversation.groupAdmins.filter(adminId => (adminId._id || adminId) !== targetUserId);
+       const updatedAdmins = activeConversation.groupAdmins.filter(adminId => getEntityId(adminId) !== targetUserId);
        set({ activeConversation: { ...activeConversation, members: updatedMembers, groupAdmins: updatedAdmins } });
     }
 
     set({ conversations: conversations.map(c => {
       if (c._id === convoId) {
-        return { ...c, members: c.members.filter(m => m._id !== targetUserId), groupAdmins: c.groupAdmins.filter(adminId => (adminId._id || adminId) !== targetUserId) };
+        return { ...c, members: c.members.filter(m => m._id !== targetUserId), groupAdmins: c.groupAdmins.filter(adminId => getEntityId(adminId) !== targetUserId) };
       }
       return c;
     })});
@@ -457,7 +461,7 @@ const useChatStore = create((set, get) => ({
     try {
        await axiosInstance.patch(`/conversation/${convoId}/remove`, { targetUserId });
        toast.success("User removed from group");
-    } catch(err) {
+    } catch {
        // Rollback
        set({ activeConversation: prevActiveConversation, conversations: prevConversations });
        toast.error("Failed to remove user");
@@ -484,7 +488,7 @@ const useChatStore = create((set, get) => ({
     try {
        await axiosInstance.patch(`/conversation/${convoId}/promote`, { targetUserId });
        toast.success("Promoted to Admin");
-    } catch(err) {
+    } catch {
        set({ activeConversation: prevActiveConversation, conversations: prevConversations });
        toast.error("Failed to promote user");
     }
@@ -513,7 +517,7 @@ const useChatStore = create((set, get) => ({
     try {
        await axiosInstance.patch(`/conversation/${convoId}/metadata`, updatePayload);
        toast.success("Group metadata updated");
-    } catch(err) {
+    } catch {
        set({ activeConversation: prevActiveConversation, conversations: prevConversations });
        toast.error("Failed to update group metadata");
     }
@@ -524,7 +528,7 @@ const useChatStore = create((set, get) => ({
     const { activeConversation, conversations } = get();
     
     // If the current user was the one removed from the group, they shouldn't see it anymore.
-    const currentUser = useAuthStore.getState().user;
+    const currentUser = useAuthStore.getState().authUser;
     if (currentUser && currentUser._id === targetUserId) {
         set({ conversations: conversations.filter(c => c._id !== convoId) });
         if (activeConversation && activeConversation._id === convoId) {
@@ -536,13 +540,13 @@ const useChatStore = create((set, get) => ({
 
     if (activeConversation && activeConversation._id === convoId) {
        const updatedMembers = activeConversation.members.filter(m => m._id !== targetUserId);
-       const updatedAdmins = activeConversation.groupAdmins.filter(adminId => (adminId._id || adminId) !== targetUserId);
+       const updatedAdmins = activeConversation.groupAdmins.filter(adminId => getEntityId(adminId) !== targetUserId);
        set({ activeConversation: { ...activeConversation, members: updatedMembers, groupAdmins: updatedAdmins } });
     }
 
     set({ conversations: conversations.map(c => {
       if (c._id === convoId) {
-        return { ...c, members: c.members.filter(m => m._id !== targetUserId), groupAdmins: c.groupAdmins.filter(adminId => (adminId._id || adminId) !== targetUserId) };
+        return { ...c, members: c.members.filter(m => m._id !== targetUserId), groupAdmins: c.groupAdmins.filter(adminId => getEntityId(adminId) !== targetUserId) };
       }
       return c;
     })});
@@ -565,7 +569,7 @@ const useChatStore = create((set, get) => ({
   handleIncomingGroupAdminPromoted: ({ convoId, targetUserId }) => {
      const { activeConversation, conversations } = get();
      if (activeConversation && activeConversation._id === convoId) {
-        if (!activeConversation.groupAdmins.some(a => (a._id || a) === targetUserId)) {
+        if (!activeConversation.groupAdmins.some(a => getEntityId(a) === targetUserId)) {
             const updatedAdmins = [...activeConversation.groupAdmins, targetUserId];
             set({ activeConversation: { ...activeConversation, groupAdmins: updatedAdmins } });
         }
@@ -573,7 +577,7 @@ const useChatStore = create((set, get) => ({
      
      set({ conversations: conversations.map(c => {
        if (c._id === convoId) {
-           if (!c.groupAdmins.some(a => (a._id || a) === targetUserId)) {
+           if (!c.groupAdmins.some(a => getEntityId(a) === targetUserId)) {
               return { ...c, groupAdmins: [...c.groupAdmins, targetUserId] };
            }
        }

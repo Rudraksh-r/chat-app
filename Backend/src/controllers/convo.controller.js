@@ -56,8 +56,8 @@ const createGroupChat = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Group name and an array of valid member IDs are mandatory fields");
     }
 
-    if (memberIds.length < 2) {
-        throw new ApiError(400, "A standard group requires at least 2 other distinct members");
+    if (memberIds.length < 1) {
+        throw new ApiError(400, "A group requires at least one other member");
     }
 
     // Deduplicate members list and ensure creator is explicitly present
@@ -65,7 +65,7 @@ const createGroupChat = asyncHandler(async (req, res) => {
 
     const newGroup = await Conversation.create({
         isGroupChat: true,
-        chatName: name,
+        groupName: name,
         members: uniqueMembers,
         groupAdmins: [creatorId]
     });
@@ -168,7 +168,11 @@ const promoteToAdmin = asyncHandler(async (req, res) => {
     const { targetUserId } = req.body;
     const conversation = req.conversation;
 
-    if (!conversation.members.includes(targetUserId)) {
+    const isMember = conversation.members.some(
+        (memberId) => memberId.toString() === targetUserId.toString()
+    );
+
+    if (!isMember) {
         throw new ApiError(400, "Target user is not currently an active member of this group");
     }
 

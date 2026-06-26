@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { ChatLayout } from './pages/ChatLayout'
-import { Profile } from './pages/profile'
+import { Profile } from './pages/Profile'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import useAuthStore from './store/authStore'

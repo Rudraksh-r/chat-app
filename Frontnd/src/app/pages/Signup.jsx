@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion as Motion } from "framer-motion";
 import { Mail, Lock, User, Image as ImageIcon } from "lucide-react";
 import { Button, Input } from "../components/ui/index";
 import useAuthStore from "../store/authStore";
@@ -26,7 +26,7 @@ export function Signup() {
       {/* Background decoration */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px]" />
       
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-[#111827] rounded-3xl p-8 shadow-2xl shadow-indigo-500/5 border border-slate-800/50 z-10"
@@ -107,7 +107,7 @@ export function Signup() {
             Sign in
           </Link>
         </p>
-      </motion.div>
+      </Motion.div>
     </div>
   );
 }

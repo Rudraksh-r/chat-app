@@ -24,6 +24,14 @@ const sendMessage = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Conversation not found")
     }
 
+    const isSenderMember = convoExists.members.some(
+        (member) => member.toString() === senderId.toString()
+    );
+
+    if (!isSenderMember) {
+        throw new ApiError(403, "You are not a member of this conversation")
+    }
+
     // ── Multi-format upload pipeline ─────────────────────────────
     let imageUrl = "";
     let documentData = {};
@@ -99,24 +107,6 @@ const sendMessage = asyncHandler(async (req, res) => {
         }
     ]);
 
-    await Conversation.findByIdAndUpdate(convoId, { lastMessage: text });
-
-    const receiverId = convoExists.members.find(
-        (member) => member.toString() !== senderId.toString()
-    );
-
-    if (receiverId) {
-        const receiverSocketIds = getReceiverSocketIds(receiverId.toString());
-        if (receiverSocketIds.length > 0) {
-            message.status = "delivered";
-            await message.save();
-
-            receiverSocketIds.forEach((socketId) => {
-                io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_RECEIVE, message);
-            });
-        }
-    }
-
     // Determine sidebar preview text based on media type
     let displayLastMessage = text;
     if (!displayLastMessage) {
@@ -131,21 +121,22 @@ const sendMessage = asyncHandler(async (req, res) => {
         (member) => member.toString() !== senderId.toString()
     );
 
-    let isAnyDelivered = false;
+    const targetSocketIds = [];
 
     otherMembers.forEach((memberId) => {
         const receiverSocketIds = getReceiverSocketIds(memberId.toString());
         if (receiverSocketIds.length > 0) {
-            isAnyDelivered = true;
-            receiverSocketIds.forEach((socketId) => {
-                io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_RECEIVE, message);
-            });
+            targetSocketIds.push(...receiverSocketIds);
         }
     });
 
-    if (isAnyDelivered) {
+    if (targetSocketIds.length > 0) {
         message.status = "delivered";
         await message.save();
+
+        targetSocketIds.forEach((socketId) => {
+            io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_RECEIVE, message);
+        });
     }
 
     return res.status(201)
@@ -311,7 +302,7 @@ const editMessage = asyncHandler(async (req, res) => {
     // Update sidebar context
     const conversation = await Conversation.findById(message.convoId);
     if (conversation) {
-        const lastSavedMsg = await Message.findOne({ ConvoId: message.convoId }).sort({ createdAt: -1 })
+        const lastSavedMsg = await Message.findOne({ convoId: message.convoId }).sort({ createdAt: -1 })
         if (lastSavedMsg && lastSavedMsg._id.toString() === message._id.toString()) {
             conversation.lastMessage = text;
             await conversation.save();
