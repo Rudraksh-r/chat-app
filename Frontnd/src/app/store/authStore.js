@@ -1,44 +1,106 @@
-import { create } from 'zustand';
-import axiosInstance from '../lib/axios';
-import { toast } from 'sonner';
-import useSocketStore from './socketStore';
-import useChatStore from './chatStore';
+import { create } from "zustand";
+import axiosInstance from "../lib/axios";
+import { toast } from "sonner";
+import useSocketStore from "./socketStore";
+import useChatStore from "./chatStore";
+import { generateKeyPair, exportPublicKey } from "../lib/crypto";
+import { getPrivateKey, storePrivateKey } from "../lib/keyStorage";
 
-const useAuthStore = create((set) => ({
+const useAuthStore = create((set, get) => ({
   // State
   authUser: null,
   isLoading: false,
   isCheckingAuth: true,
   isUploadingAvatar: false,
+  myPrivateKey: null,
 
-  // Check if user is already logged in (called on app mount)
+  // ── Ensure keypair exists on this device ─────────────────────────────────
+  // This runs in the background after auth so the main auth UX is never blocked.
+  _setupCrypto: async (user) => {
+    if (!user?._id) return false;
+
+    try {
+      const existingPrivateKey = await getPrivateKey(user._id);
+      const hasServerPublicKey = Boolean(user.publicKey);
+
+      if (existingPrivateKey && hasServerPublicKey) {
+        console.log("✅ E2EE: Existing keypair found in IndexedDB");
+        return true;
+      }
+
+      if (existingPrivateKey && !hasServerPublicKey) {
+        console.warn(
+          "⚠️ E2EE: Local private key found but server public key missing. Regenerating keypair.",
+        );
+      } else {
+        console.log(
+          "🔑 E2EE: No keypair found — generating new keypair for this device",
+        );
+      }
+
+      const keyPair = await generateKeyPair();
+      const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
+
+      await storePrivateKey(user._id, keyPair.privateKey);
+      await axiosInstance.put("/user/public-key", {
+        publicKey: publicKeyB64,
+      });
+
+      console.log("✅ E2EE: New keypair generated and public key uploaded");
+      return true;
+    } catch (error) {
+      console.error("❌ E2EE: Key generation/setup failed:", error);
+      return false;
+    }
+  },
+
+  ensureKeyPair: async (userId, hasServerPublicKey = true) => {
+    return get()._setupCrypto({
+      _id: userId,
+      publicKey: hasServerPublicKey ? "present" : null,
+    });
+  },
+
   checkAuth: async () => {
     try {
-      const res = await axiosInstance.get('/auth/get-user');
-      set({ authUser: res.data.data });
-      // Connect socket after verifying auth
-      useSocketStore.getState().connectSocket(res.data.data._id);
+      const res = await axiosInstance.get("/auth/get-user");
+      const user = res.data.data;
+      set({ authUser: user });
+
+      useSocketStore.getState().connectSocket(user._id);
+      void get()._setupCrypto(user).catch((err) => {
+        console.error("E2EE setup failed during checkAuth:", err?.message || err);
+      });
     } catch (error) {
       set({ authUser: null });
-      console.log('Not authenticated:', error.response?.data?.message || error.message);
+      console.log(
+        "Not authenticated:",
+        error.response?.data?.message || error.message,
+      );
     } finally {
       set({ isCheckingAuth: false });
     }
   },
 
-  // Signup
   signup: async (formData) => {
     set({ isLoading: true });
     try {
-      const res = await axiosInstance.post('/auth/register', formData);
+      const res = await axiosInstance.post("/auth/register", {
+        ...formData,
+        publicKey: null,
+      });
+
       const { createdUser } = res.data.data;
+
       set({ authUser: createdUser });
-      // Connect socket after signup
       useSocketStore.getState().connectSocket(createdUser._id);
-      toast.success('Account created successfully!');
+      void get()._setupCrypto(createdUser).catch((err) => {
+        console.error("E2EE setup failed after signup:", err?.message || err);
+      });
+      toast.success("Account created successfully!");
       return true;
     } catch (error) {
-      const message = error.response?.data?.message || 'Signup failed';
+      const message = error.response?.data?.message || "Signup failed";
       toast.error(message);
       return false;
     } finally {
@@ -46,19 +108,29 @@ const useAuthStore = create((set) => ({
     }
   },
 
-  // Login
   login: async (formData) => {
     set({ isLoading: true });
     try {
-      const res = await axiosInstance.post('/auth/login', formData);
+      const res = await axiosInstance.post("/auth/login", formData);
       const { loggedInUser } = res.data.data;
+
       set({ authUser: loggedInUser });
-      // Connect socket after login
       useSocketStore.getState().connectSocket(loggedInUser._id);
-      toast.success('Welcome back!');
+      toast.success("Welcome back!");
+
+      void get()._setupCrypto(loggedInUser).then((result) => {
+        if (!result) {
+          toast.warning(
+            "Encryption setup had an issue. Reload if messages don't decrypt.",
+            { duration: 6000 },
+          );
+        }
+      }).catch((err) => {
+        console.error("E2EE setup failed after login:", err?.message || err);
+      });
       return true;
     } catch (error) {
-      const message = error.response?.data?.message || 'Login failed';
+      const message = error.response?.data?.message || "Login failed";
       toast.error(message);
       return false;
     } finally {
@@ -66,36 +138,35 @@ const useAuthStore = create((set) => ({
     }
   },
 
-  // Logout
   logout: async () => {
     try {
-      // Disconnect socket and clear chat state
       useSocketStore.getState().disconnectSocket();
       useChatStore.getState().clearChat();
+      // NOTE: We do NOT delete the private key from IndexedDB on logout.
+      // The user expects to be able to decrypt their history when they log
+      // back in on the same device. Deleting the key would break that.
+      // Explicit "clear this device" should be a separate UX action.
       set({ authUser: null });
-      toast.success('Logged out successfully');
-    } catch {
-      toast.error('Logout failed');
+      toast.success("Logged out successfully");
+    } catch (error) {
+      toast.error("Logout failed");
     }
   },
 
-  // Update Profile
   updateProfile: async (data) => {
     set({ isLoading: true });
     try {
-      const res = await axiosInstance.put('/user/profile', data);
+      const res = await axiosInstance.put("/user/profile", data);
       set({ authUser: res.data.data });
-      toast.success('Profile updated successfully');
+      toast.success("Profile updated successfully");
       return true;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to update profile';
-      toast.error(message);
+      toast.error(error.response?.data?.message || "Failed to update profile");
       return false;
     } finally {
       set({ isLoading: false });
     }
   },
-
   updateAvatar: async (file) => {
     set({ isLoading: true });
     try {
@@ -114,14 +185,14 @@ const useAuthStore = create((set) => ({
       toast.success("Avatar updated successfully!");
       return true;
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to update avatar";
+      const message =
+        error.response?.data?.message || "Failed to update avatar";
       toast.error(message);
       return false;
     } finally {
       set({ isLoading: false });
     }
-  }
-
+  },
 }));
 
 export default useAuthStore;

@@ -1,8 +1,8 @@
-import { create } from 'zustand';
-import { io } from 'socket.io-client';
-import useChatStore from './chatStore';
+import { create } from "zustand";
+import { io } from "socket.io-client";
+import useChatStore from "./chatStore";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5001";
 
 // Phase 2.5 #10: Mirror backend event names on the frontend
 const SOCKET_EVENTS = {
@@ -15,12 +15,13 @@ const SOCKET_EVENTS = {
   MESSAGE_DELETED: "message:deleted",
   MESSAGE_EDITED: "message:edited",
   MESSAGE_REACTION: "message:reaction",
-  
+
   // Group Management
   GROUP_MEMBER_ADDED: "group:member_added",
   GROUP_MEMBER_REMOVED: "group:member_removed",
   GROUP_ADMIN_PROMOTED: "group:admin_promoted",
   GROUP_METADATA_UPDATED: "group:metadata_updated",
+  GROUP_KEY_ROTATION_REQUIRED:  "group:key_rotation_required",
 };
 
 const useSocketStore = create((set, get) => ({
@@ -36,8 +37,8 @@ const useSocketStore = create((set, get) => ({
       withCredentials: true, // Send cookies for JWT auth
     });
 
-    newSocket.on('connect', () => {
-      console.log('🟢 Socket connected:', newSocket.id);
+    newSocket.on("connect", () => {
+      console.log("🟢 Socket connected:", newSocket.id);
     });
 
     // Listen for online users list
@@ -66,20 +67,25 @@ const useSocketStore = create((set, get) => ({
 
     // Phase 2.5 #6: Listen for server errors
     newSocket.on(SOCKET_EVENTS.ERROR, (errorMsg) => {
-      console.error('🔴 Socket error from server:', errorMsg);
+      console.error("🔴 Socket error from server:", errorMsg);
     });
 
-    newSocket.on('connect_error', (err) => {
-      console.error('🔴 Socket connection error:', err.message);
+    newSocket.on("connect_error", (err) => {
+      console.error("🔴 Socket connection error:", err.message);
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('🔴 Socket disconnected');
+    newSocket.on("disconnect", () => {
+      console.log("🔴 Socket disconnected");
     });
 
-    newSocket.on(SOCKET_EVENTS.MESSAGE_DELETED, ({ messageId, convoId, permanently }) => {
-      useChatStore.getState().markMessagesAsDeleted(messageId, convoId, permanently);
-    });
+    newSocket.on(
+      SOCKET_EVENTS.MESSAGE_DELETED,
+      ({ messageId, convoId, permanently }) => {
+        useChatStore
+          .getState()
+          .markMessagesAsDeleted(messageId, convoId, permanently);
+      },
+    );
 
     newSocket.on(SOCKET_EVENTS.MESSAGE_REACTION, (payload) => {
       useChatStore.getState().updateIncomingReaction(payload);
@@ -114,6 +120,21 @@ const useSocketStore = create((set, get) => ({
       }
     });
 
+    newSocket.on(
+      SOCKET_EVENTS.GROUP_KEY_ROTATION_REQUIRED,
+      async ({ convoId, newKeyEpoch }) => {
+        // This event fires when a member is removed from a group.
+        // Every remaining member must rotate their sender key.
+        // The removal of the member from the conversation.members array
+        // has already happened server-side before this event fires,
+        // so distributeSenderKey will naturally exclude the removed member.
+        await useChatStore.getState().handleGroupKeyRotationRequired({
+          convoId,
+          newKeyEpoch,
+        });
+      },
+    );
+
     set({ socket: newSocket });
   },
 
@@ -143,8 +164,6 @@ const useSocketStore = create((set, get) => ({
     const { socket } = get();
     if (socket) socket.emit(SOCKET_EVENTS.MESSAGE_SEEN, { convoId, senderId });
   },
-
-
 }));
 
 export default useSocketStore;

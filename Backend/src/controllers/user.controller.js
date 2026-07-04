@@ -75,4 +75,64 @@ const updateAvatar = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, user, "Avatar updated successfully"));
 });
 
-export { searchUsers, updateProfile, updateAvatar };
+// Backend/src/controllers/user.controller.js — add this function
+
+const updatePublicKey = asyncHandler(async (req, res) => {
+  const { publicKey } = req.body;
+
+  if (!publicKey) {
+    throw new ApiError(400, 'Public key is required');
+  }
+
+  // Basic validation — browser-generated ECDH public keys are base64-encoded
+  // and are typically shorter than 100 chars, so we accept any non-empty,
+  // base64-like string rather than enforcing an overly large minimum length.
+  const normalizedPublicKey = publicKey.trim();
+  if (
+    typeof normalizedPublicKey !== 'string' ||
+    normalizedPublicKey.length < 20 ||
+    !/^[A-Za-z0-9+/=]+$/.test(normalizedPublicKey)
+  ) {
+    throw new ApiError(400, 'Invalid public key format');
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { publicKey: normalizedPublicKey } },
+    { new: true }
+  ).select('-password -refreshToken');
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, 'Public key updated successfully'));
+});
+
+const getUserPublicKey = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  if (!userId || userId.length !== 24) {
+    throw new ApiError(400, "Invalid user ID format");
+  }
+
+  const user = await User.findById(userId).select("publicKey fullName");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        publicKey: user.publicKey ?? null,
+        userId: user._id,
+        fullName: user.fullName,
+      },
+      user.publicKey
+        ? "Public key fetched successfully"
+        : "User found but has no public key registered"
+    )
+  );
+});
+
+export { searchUsers, updateProfile, updateAvatar, updatePublicKey, getUserPublicKey };

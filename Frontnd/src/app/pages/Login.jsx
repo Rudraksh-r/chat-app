@@ -20,31 +20,31 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0F172A] flex items-center justify-center p-4">
+    <div className="min-h-screen w-full bg-background text-foreground flex items-center justify-center p-4">
       {/* Background decoration */}
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px]" />
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/20 rounded-full blur-[100px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-[100px]" />
 
       <Motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-[#111827] rounded-3xl p-8 shadow-2xl shadow-indigo-500/5 border border-slate-800/50 z-10"
+        className="w-full max-w-md bg-card rounded-3xl p-8 shadow-2xl shadow-primary/5 border border-border z-10"
       >
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/25">
+          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/25">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="white" />
-              <path d="M2 17L12 22L22 17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 12L12 17L22 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="var(--primary-foreground)" />
+              <path d="M2 17L12 22L22 17" stroke="var(--primary-foreground)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 12L12 17L22 12" stroke="var(--primary-foreground)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-2">Welcome back</h1>
-          <p className="text-slate-400">Sign in to continue your conversations</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Welcome back</h1>
+          <p className="text-muted-foreground">Sign in to continue your conversations</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-300 ml-1">Email address</label>
+            <label className="text-sm font-medium text-muted-foreground ml-1">Email address</label>
             <Input
               type="email"
               placeholder="name@company.com"
@@ -57,8 +57,8 @@ export function Login() {
 
           <div className="space-y-1">
             <div className="flex items-center justify-between ml-1">
-              <label className="text-sm font-medium text-slate-300">Password</label>
-              <a href="#" className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors">Forgot password?</a>
+              <label className="text-sm font-medium text-muted-foreground">Password</label>
+              <a href="#" className="text-sm font-medium text-primary hover:opacity-80 transition-colors">Forgot password?</a>
             </div>
             <Input
               type="password"
@@ -71,8 +71,8 @@ export function Login() {
           </div>
 
           <div className="flex items-center space-x-2 ml-1">
-            <input type="checkbox" id="remember" className="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500/50 w-4 h-4" />
-            <label htmlFor="remember" className="text-sm text-slate-400 cursor-pointer">Remember me for 30 days</label>
+            <input type="checkbox" id="remember" className="rounded bg-input border-border text-primary focus:ring-primary/50 w-4 h-4" />
+            <label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer">Remember me for 30 days</label>
           </div>
 
           <Button type="submit" className="w-full h-12 text-base mt-4 group" isLoading={isLoading}>
@@ -81,9 +81,9 @@ export function Login() {
           </Button>
         </form>
 
-        <p className="mt-8 text-center text-sm text-slate-400">
+        <p className="mt-8 text-center text-sm text-muted-foreground">
           Don't have an account?{" "}
-          <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+          <Link to="/signup" className="text-primary hover:opacity-80 font-medium transition-colors">
             Create an account
           </Link>
         </p>

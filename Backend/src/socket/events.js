@@ -7,28 +7,31 @@ export const SOCKET_EVENTS = {
   DISCONNECT: "disconnect",
 
   // User Presence
-  USER_ONLINE: "user:online",           // Server → Client: list of online user IDs
-  USER_OFFLINE: "user:offline",         // Server → Client: a specific user went offline
+  USER_ONLINE: "user:online", // Server → Client: list of online user IDs
+  USER_OFFLINE: "user:offline", // Server → Client: a specific user went offline
 
   // Messages
-  MESSAGE_SEND: "message:send",         // Client → Server: new message
-  MESSAGE_RECEIVE: "message:receive",   // Server → Client: incoming message
-  MESSAGE_DELIVERED: "message:delivered",// Server → Client: message was delivered
-  MESSAGE_SEEN: "message:seen",         // Client ↔ Server: message was read
-  MESSAGE_DELETED: "message:deleted",   // Server → Client: soft-deleted message update
-  MESSAGE_EDITED: "message:edited",    // Server → Client: message was edited
-  MESSAGE_REACTION: "message:reaction",// Server → Client: message was reacted to
-  
+  MESSAGE_SEND: "message:send", // Client → Server: new message
+  MESSAGE_RECEIVE: "message:receive", // Server → Client: incoming message
+  MESSAGE_DELIVERED: "message:delivered", // Server → Client: message was delivered
+  MESSAGE_SEEN: "message:seen", // Client ↔ Server: message was read
+  MESSAGE_DELETED: "message:deleted", // Server → Client: soft-deleted message update
+  MESSAGE_EDITED: "message:edited", // Server → Client: message was edited
+  MESSAGE_REACTION: "message:reaction", // Server → Client: message was reacted to
+
   // Group Management
   GROUP_MEMBER_ADDED: "group:member_added",
   GROUP_MEMBER_REMOVED: "group:member_removed",
   GROUP_ADMIN_PROMOTED: "group:admin_promoted",
   GROUP_METADATA_UPDATED: "group:metadata_updated",
 
+  // E2EE: Group Key Rotation
+  GROUP_KEY_ROTATION_REQUIRED: "group:key_rotation_required",
+
   // Typing
-  TYPING_START: "typing:start",         // Client → Server → Client
-  TYPING_STOP: "typing:stop",           // Client → Server → Client
+  TYPING_START: "typing:start", // Client → Server → Client
+  TYPING_STOP: "typing:stop", // Client → Server → Client
 
   // Errors
-  ERROR: "socket:error",                // Server → Client: error occurred
+  ERROR: "socket:error", // Server → Client: error occurred
 };

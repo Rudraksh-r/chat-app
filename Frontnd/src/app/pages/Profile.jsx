@@ -58,23 +58,23 @@ export function Profile() {
   const displayAvatar = avatarPreview || getAvatarUrl(authUser);
 
   return (
-    <div className="min-h-screen w-full bg-[#0F172A] flex justify-center p-4 py-8 sm:py-12">
-      <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen w-full bg-background text-foreground flex justify-center p-4 py-8 sm:py-12">
+      <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
 
       <Motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl bg-[#111827] rounded-3xl shadow-2xl shadow-indigo-500/5 border border-slate-800/50 z-10 flex flex-col overflow-hidden"
+        className="w-full max-w-2xl bg-card rounded-3xl shadow-2xl shadow-primary/5 border border-border z-10 flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-800/60 bg-[#111827]/80 backdrop-blur-md">
+        <div className="flex items-center justify-between p-6 border-b border-border bg-card/80 backdrop-blur-md">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-full" onClick={() => navigate("/")}>
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-secondary/40 rounded-full" onClick={() => navigate("/")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-semibold text-slate-100">Account Settings</h1>
+            <h1 className="text-xl font-semibold text-foreground">Account Settings</h1>
           </div>
-          <Button variant="ghost" className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors" onClick={handleLogout}>
+          <Button variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" onClick={handleLogout}>
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out
           </Button>
@@ -86,7 +86,7 @@ export function Profile() {
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-10">
             <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
               <Avatar src={displayAvatar} size="xl" />
-              <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity border-2 border-indigo-500">
+              <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity border-2 border-primary">
                 {isLoading ? (
                   <Loader2 className="w-6 h-6 text-white animate-spin" />
                 ) : (
@@ -107,8 +107,8 @@ export function Profile() {
             </div>
 
             <div className="text-center sm:text-left space-y-1 mt-2 sm:mt-0">
-              <h3 className="text-lg font-medium text-slate-200">Profile Picture</h3>
-              <p className="text-sm text-slate-400 max-w-xs">
+              <h3 className="text-lg font-medium text-foreground">Profile Picture</h3>
+              <p className="text-sm text-muted-foreground max-w-xs">
                 Click your avatar to upload a new photo. JPG, PNG or WebP, max 5MB.
               </p>
               <div className="pt-2 flex justify-center sm:justify-start gap-2">
@@ -129,14 +129,14 @@ export function Profile() {
             </div>
           </div>
 
-          <div className="w-full h-px bg-slate-800/60 mb-10" />
+          <div className="w-full h-px bg-border/60 mb-10" />
 
           {/* Personal Information */}
           <div className="space-y-6 max-w-lg">
-            <h3 className="text-lg font-medium text-slate-200 mb-4">Personal Information</h3>
+            <h3 className="text-lg font-medium text-foreground mb-4">Personal Information</h3>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Full Name</label>
+              <label className="text-sm font-medium text-muted-foreground ml-1">Full Name</label>
               <Input
                 type="text"
                 value={fullName}
@@ -147,7 +147,7 @@ export function Profile() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Username</label>
+              <label className="text-sm font-medium text-muted-foreground ml-1">Username</label>
               <Input
                 type="text"
                 value={username}
@@ -155,18 +155,18 @@ export function Profile() {
                 icon={User}
                 required
               />
-              <p className="text-xs text-slate-500 ml-1 mt-1">This is your public display name.</p>
+              <p className="text-xs text-muted-foreground/80 ml-1 mt-1">This is your public display name.</p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
+              <label className="text-sm font-medium text-muted-foreground ml-1">Email Address</label>
               <Input type="email" value={email} icon={Mail} disabled />
-              <p className="text-xs text-slate-500 ml-1 mt-1">Email cannot be changed for security reasons.</p>
+              <p className="text-xs text-muted-foreground/80 ml-1 mt-1">Email cannot be changed for security reasons.</p>
             </div>
 
             <div className="space-y-2 pt-4">
-              <h3 className="text-lg font-medium text-slate-200 mb-2">Security</h3>
-              <label className="text-sm font-medium text-slate-300 ml-1">Password</label>
+              <h3 className="text-lg font-medium text-foreground mb-2">Security</h3>
+              <label className="text-sm font-medium text-muted-foreground ml-1">Password</label>
               <div className="flex gap-3">
                 <Input type="password" value="••••••••" icon={Lock} disabled />
                 <Button type="button" variant="secondary" className="shrink-0" disabled>Change</Button>
@@ -176,11 +176,11 @@ export function Profile() {
         </form>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-800/60 bg-[#111827] flex justify-end gap-3 mt-auto">
+        <div className="p-6 border-t border-border bg-card flex justify-end gap-3 mt-auto">
           <Button type="button" variant="ghost" onClick={() => navigate("/")} disabled={isLoading}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSave} className="shadow-lg shadow-indigo-500/20" disabled={isLoading}>
+          <Button type="submit" onClick={handleSave} className="shadow-lg shadow-primary/20" disabled={isLoading}>
             {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             {isLoading ? "Saving..." : "Save Changes"}
           </Button>

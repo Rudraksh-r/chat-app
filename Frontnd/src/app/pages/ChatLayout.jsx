@@ -26,18 +26,22 @@ import {
   FileText,
   Music,
   Download,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { formatTime, formatTimeAgo, cn } from "../lib/utils";
 import { Button, Avatar } from "../components/ui/index";
 import useAuthStore from "../store/authStore";
 import useChatStore from "../store/chatStore";
 import useSocketStore from "../store/socketStore";
+import useThemeStore from "../store/themeStore";
 import { toast } from "sonner";
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 export function ChatLayout() {
   const { authUser, logout } = useAuthStore();
+  const { theme, toggleTheme } = useThemeStore();
   const {
     conversations,
     activeConversation,
@@ -80,8 +84,8 @@ export function ChatLayout() {
     }
   };
 
-  const getMessageSenderId = (msg) => typeof msg.senderId === "object" ? msg.senderId?._id : msg.senderId;
-
+  const getMessageSenderId = (msg) =>
+    typeof msg.senderId === "object" ? msg.senderId?._id : msg.senderId;
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [contextMenuMsgId, setContextMenuMsgId] = useState(null);
@@ -142,8 +146,8 @@ export function ChatLayout() {
       } else {
         // If search query is empty, suggest users from existing conversations
         const uniqueMembersMap = {};
-        conversations.forEach(convo => {
-          convo.members.forEach(member => {
+        conversations.forEach((convo) => {
+          convo.members.forEach((member) => {
             if (member._id !== authUser?._id) {
               uniqueMembersMap[member._id] = member;
             }
@@ -188,7 +192,7 @@ export function ChatLayout() {
   useEffect(() => {
     if (activeConversation && authUser) {
       if (activeConversation.isGroupChat) {
-        activeConversation.members.forEach(member => {
+        activeConversation.members.forEach((member) => {
           if (member._id !== authUser._id) {
             emitMessageSeen(activeConversation._id, member._id);
           }
@@ -242,7 +246,11 @@ export function ChatLayout() {
         emitStopTyping({ convoId: activeConversation._id });
       } else {
         const otherUser = getOtherUser(activeConversation);
-        if (otherUser) emitStopTyping({ convoId: activeConversation._id, receiverId: otherUser._id });
+        if (otherUser)
+          emitStopTyping({
+            convoId: activeConversation._id,
+            receiverId: otherUser._id,
+          });
       }
     }
   };
@@ -273,7 +281,11 @@ export function ChatLayout() {
 
   const removefile = () => {
     // Revoke object URL to prevent memory leaks
-    if (mediaPreviewType === "image" && mediaPreview && mediaPreview.startsWith("blob:")) {
+    if (
+      mediaPreviewType === "image" &&
+      mediaPreview &&
+      mediaPreview.startsWith("blob:")
+    ) {
       URL.revokeObjectURL(mediaPreview);
     }
     setMediaPreview(null);
@@ -291,7 +303,11 @@ export function ChatLayout() {
       emitTyping({ convoId: activeConversation._id });
     } else {
       const otherUser = getOtherUser(activeConversation);
-      if (otherUser) emitTyping({ convoId: activeConversation._id, receiverId: otherUser._id });
+      if (otherUser)
+        emitTyping({
+          convoId: activeConversation._id,
+          receiverId: otherUser._id,
+        });
     }
 
     // Clear previous timeout and set a new one
@@ -301,7 +317,11 @@ export function ChatLayout() {
         emitStopTyping({ convoId: activeConversation._id });
       } else {
         const otherUser = getOtherUser(activeConversation);
-        if (otherUser) emitStopTyping({ convoId: activeConversation._id, receiverId: otherUser._id });
+        if (otherUser)
+          emitStopTyping({
+            convoId: activeConversation._id,
+            receiverId: otherUser._id,
+          });
       }
     }, 1500);
   };
@@ -322,44 +342,56 @@ export function ChatLayout() {
   };
 
   // Derive active chat info
-  const otherUser = activeConversation && !activeConversation.isGroupChat
-    ? getOtherUser(activeConversation)
-    : null;
-  
+  const otherUser =
+    activeConversation && !activeConversation.isGroupChat
+      ? getOtherUser(activeConversation)
+      : null;
+
   const chatTitle = activeConversation
-    ? (activeConversation.isGroupChat
+    ? activeConversation.isGroupChat
       ? activeConversation.groupName
-      : otherUser?.fullName || otherUser?.username || "Chat")
+      : otherUser?.fullName || otherUser?.username || "Chat"
     : "Chat";
 
   const chatAvatar = activeConversation
-    ? (activeConversation.isGroupChat
-      ? (activeConversation.groupAvatar || getAvatarUrl({ fullName: activeConversation.groupName }))
-      : getAvatarUrl(otherUser))
+    ? activeConversation.isGroupChat
+      ? activeConversation.groupAvatar ||
+        getAvatarUrl({ fullName: activeConversation.groupName })
+      : getAvatarUrl(otherUser)
     : "";
 
-  const isOtherOnline = !activeConversation?.isGroupChat && otherUser ? isUserOnline(otherUser._id) : false;
-  
+  const isOtherOnline =
+    !activeConversation?.isGroupChat && otherUser
+      ? isUserOnline(otherUser._id)
+      : false;
+
   const isOtherTyping = activeConversation
-    ? (activeConversation.isGroupChat
-      ? typingUsers.some(t => typeof t === "object" && t.convoId === activeConversation._id)
-      : typingUsers.some(t => 
-          (typeof t === "object" && t.convoId === activeConversation._id) || 
-          (typeof t === "string" && t === otherUser?._id)
-        ))
+    ? activeConversation.isGroupChat
+      ? typingUsers.some(
+          (t) => typeof t === "object" && t.convoId === activeConversation._id,
+        )
+      : typingUsers.some(
+          (t) =>
+            (typeof t === "object" && t.convoId === activeConversation._id) ||
+            (typeof t === "string" && t === otherUser?._id),
+        )
     : false;
 
   const getTypingText = () => {
     if (!activeConversation) return "";
     if (activeConversation.isGroupChat) {
       const typingInThisConvo = typingUsers
-        .filter(t => typeof t === "object" && t.convoId === activeConversation._id)
-        .map(t => activeConversation.members?.find(m => m._id === t.userId))
+        .filter(
+          (t) => typeof t === "object" && t.convoId === activeConversation._id,
+        )
+        .map((t) => activeConversation.members?.find((m) => m._id === t.userId))
         .filter(Boolean);
-      
+
       if (typingInThisConvo.length === 0) return "";
-      if (typingInThisConvo.length === 1) return `${typingInThisConvo[0].fullName} is typing...`;
-      if (typingInThisConvo.length === 2) return `${typingInThisConvo[0].fullName} and ${typingInThisConvo[1].fullName} are typing...`;
+      if (typingInThisConvo.length === 1)
+        return `${typingInThisConvo[0].fullName} is typing...`;
+      if (typingInThisConvo.length === 2)
+        return `${typingInThisConvo[0].fullName} and ${typingInThisConvo[1].fullName} are typing...`;
       return "Multiple members are typing...";
     } else {
       return "typing...";
@@ -370,16 +402,23 @@ export function ChatLayout() {
     if (!activeConversation) return "";
     if (activeConversation.isGroupChat) {
       const total = activeConversation.members?.length || 0;
-      const online = activeConversation.members?.filter(m => m._id !== authUser?._id && isUserOnline(m._id)).length || 0;
+      const online =
+        activeConversation.members?.filter(
+          (m) => m._id !== authUser?._id && isUserOnline(m._id),
+        ).length || 0;
       const actualOnline = online + 1; // Include ourselves
       return `${total} members, ${actualOnline} online`;
     } else {
-      return isOtherOnline ? "Online" : otherUser?.lastSeen ? `Last seen ${formatTimeAgo(otherUser.lastSeen)}` : "Offline";
+      return isOtherOnline
+        ? "Online"
+        : otherUser?.lastSeen
+          ? `Last seen ${formatTimeAgo(otherUser.lastSeen)}`
+          : "Offline";
     }
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#0F172A] text-slate-200 overflow-hidden font-sans">
+    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden font-sans">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {!sidebarOpen && (
@@ -396,27 +435,39 @@ export function ChatLayout() {
       {/* Sidebar */}
       <Motion.div
         className={cn(
-          "fixed md:relative z-50 flex flex-col w-80 h-full bg-[#111827] border-r border-slate-800/60 shrink-0 transition-transform duration-300 ease-in-out",
+          "fixed md:relative z-50 flex flex-col w-80 h-full bg-card border-r border-border shrink-0 transition-transform duration-300 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
         {/* Sidebar Header */}
-        <div className="p-4 flex items-center justify-between border-b border-slate-800/60">
+        <div className="p-4 flex items-center justify-between border-b border-border">
           <div className="flex items-center gap-3">
             <Avatar src={getAvatarUrl(authUser)} status="online" />
             <div>
-              <h2 className="font-semibold text-slate-100 text-sm">
+              <h2 className="font-semibold text-foreground text-sm">
                 {authUser?.fullName}
               </h2>
-              <p className="text-xs text-indigo-400">@{authUser?.username}</p>
+              <p className="text-xs text-primary">@{authUser?.username}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-primary"
+              onClick={toggleTheme}
+            >
+              {theme === "dark" ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </Button>
             <Link to="/profile">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-slate-400 hover:text-indigo-400"
+                className="h-8 w-8 text-muted-foreground hover:text-primary"
               >
                 <Settings className="w-4 h-4" />
               </Button>
@@ -424,7 +475,7 @@ export function ChatLayout() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-slate-400 hover:text-red-400"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
               onClick={logout}
             >
               <LogOut className="w-4 h-4" />
@@ -432,7 +483,7 @@ export function ChatLayout() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-slate-400 md:hidden"
+              className="h-8 w-8 text-muted-foreground md:hidden"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-4 h-4" />
@@ -441,19 +492,19 @@ export function ChatLayout() {
         </div>
 
         {/* Search & Actions */}
-        <div className="p-4 space-y-4 border-b border-slate-800/60">
+        <div className="p-4 space-y-4 border-b border-border">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search users to start chatting..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#0F172A] text-sm text-slate-200 rounded-lg pl-9 pr-4 py-2 border border-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-500"
+              className="w-full bg-input text-sm text-foreground rounded-lg pl-9 pr-4 py-2 border border-border focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60"
             />
           </div>
           <div className="flex justify-between items-center">
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {searchQuery ? "Search Results" : "Messages"}
             </h3>
             {!searchQuery && (
@@ -461,7 +512,7 @@ export function ChatLayout() {
                 onClick={() => setIsCreateGroupOpen(true)}
                 variant="ghost"
                 size="sm"
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 h-7 px-2.5 bg-[#4F46E5]/10 hover:bg-[#4F46E5]/20 rounded-lg transition-all"
+                className="text-xs text-primary hover:opacity-80 flex items-center gap-1 h-7 px-2.5 bg-primary/10 hover:bg-primary/20 rounded-lg transition-all"
               >
                 <Plus className="w-3.5 h-3.5" /> Group
               </Button>
@@ -475,49 +526,52 @@ export function ChatLayout() {
             // Search results
             isSearching ? (
               <div className="flex items-center justify-center p-8">
-                <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
               </div>
             ) : searchResults.length > 0 ? (
               searchResults.map((user) => (
                 <div
                   key={user._id}
                   onClick={() => handleStartChat(user._id)}
-                  className="flex items-center gap-3 p-3 mx-2 my-1 rounded-xl cursor-pointer transition-all hover:bg-slate-800/50"
+                  className="flex items-center gap-3 p-3 mx-2 my-1 rounded-xl cursor-pointer transition-all hover:bg-secondary/40"
                 >
                   <Avatar
                     src={getAvatarUrl(user)}
                     status={isUserOnline(user._id) ? "online" : "offline"}
                   />
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-slate-200 truncate">
+                    <h4 className="text-sm font-medium text-foreground truncate">
                       {user.fullName}
                     </h4>
-                    <p className="text-xs text-slate-500 truncate">
+                    <p className="text-xs text-muted-foreground truncate">
                       @{user.username}
                     </p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-center text-sm text-slate-500 p-8">
+              <p className="text-center text-sm text-muted-foreground p-8">
                 No users found
               </p>
             )
           ) : // Conversation list
           isLoadingConversations ? (
             <div className="flex items-center justify-center p-8">
-              <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
             </div>
           ) : conversations.length > 0 ? (
             conversations.map((convo) => {
               const isGroup = convo.isGroupChat;
               const other = !isGroup ? getOtherUser(convo) : null;
               if (!isGroup && !other) return null;
-              
+
               const isActive = activeConversation?._id === convo._id;
-              const name = isGroup ? convo.groupName : (other?.fullName || other?.username || "Chat");
-              const avatar = isGroup 
-                ? (convo.groupAvatar || getAvatarUrl({ fullName: convo.groupName }))
+              const name = isGroup
+                ? convo.groupName
+                : other?.fullName || other?.username || "Chat";
+              const avatar = isGroup
+                ? convo.groupAvatar ||
+                  getAvatarUrl({ fullName: convo.groupName })
                 : getAvatarUrl(other);
               const online = !isGroup && isUserOnline(other?._id);
 
@@ -530,36 +584,46 @@ export function ChatLayout() {
                   }}
                   className={cn(
                     "flex items-center gap-3 p-3 mx-2 my-1 rounded-xl cursor-pointer transition-all group",
-                    isActive ? "bg-[#4F46E5]/10" : "hover:bg-slate-800/50",
+                    isActive ? "bg-secondary" : "hover:bg-secondary/40",
                   )}
                 >
                   <Avatar
                     src={avatar}
-                    status={isGroup ? undefined : (online ? "online" : "offline")}
+                    status={isGroup ? undefined : online ? "online" : "offline"}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <h4
                         className={cn(
                           "text-sm font-medium truncate",
-                          isActive ? "text-indigo-400" : "text-slate-200",
+                          isActive
+                            ? "text-primary font-semibold"
+                            : "text-foreground",
                         )}
                       >
                         {name}
                       </h4>
-                      <span className="text-xs text-slate-500 whitespace-nowrap ml-2">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
                         {formatTime(convo.updatedAt)}
                       </span>
                     </div>
-                    <p className={cn(
-                      "text-xs truncate", 
-                      unreadCounts[convo._id] ? "text-slate-300 font-medium" : "text-slate-500"
-                    )}>
-                      {convo.lastMessage || "No messages yet"}
+                    <p
+                      className={cn(
+                        "text-xs truncate",
+                        unreadCounts[convo._id]
+                          ? "text-foreground font-semibold"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      <span className="flex items-center gap-1">
+                        {convo.lastMessage === "[Encrypted]"
+                          ? "New message"
+                          : convo.lastMessage || "No messages yet"}
+                      </span>
                     </p>
                   </div>
                   {unreadCounts[convo._id] > 0 && (
-                    <div className="shrink-0 flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-indigo-500 text-[10px] font-bold text-white shadow-sm shadow-indigo-500/30">
+                    <div className="shrink-0 flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm shadow-primary/30">
                       {unreadCounts[convo._id]}
                     </div>
                   )}
@@ -568,8 +632,10 @@ export function ChatLayout() {
             })
           ) : (
             <div className="text-center p-8">
-              <p className="text-sm text-slate-500">No conversations yet</p>
-              <p className="text-xs text-slate-600 mt-1">
+              <p className="text-sm text-muted-foreground">
+                No conversations yet
+              </p>
+              <p className="text-xs text-muted-foreground/80 mt-1">
                 Search for users above to start chatting!
               </p>
             </div>
@@ -578,38 +644,44 @@ export function ChatLayout() {
       </Motion.div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#0F172A] relative">
+      <div className="flex-1 flex flex-col min-w-0 bg-background relative">
         {activeConversation ? (
           <>
             {/* Chat Header */}
-            <div className="h-16 border-b border-slate-800/60 bg-[#111827]/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-10">
+            <div className="h-16 border-b border-border bg-card/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-10">
               <div className="flex items-center gap-3">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden mr-1 -ml-2 text-slate-400"
+                  className="md:hidden mr-1 -ml-2 text-muted-foreground"
                   onClick={() => setSidebarOpen(true)}
                 >
                   <Menu className="w-5 h-5" />
                 </Button>
                 <Avatar
                   src={chatAvatar}
-                  status={activeConversation.isGroupChat ? undefined : (isOtherOnline ? "online" : "offline")}
+                  status={
+                    activeConversation.isGroupChat
+                      ? undefined
+                      : isOtherOnline
+                        ? "online"
+                        : "offline"
+                  }
                 />
-                <div 
+                <div
                   className="cursor-pointer group"
                   onClick={() => {
-                     if (activeConversation?.isGroupChat) {
-                         setIsGroupInfoOpen(true);
-                     }
+                    if (activeConversation?.isGroupChat) {
+                      setIsGroupInfoOpen(true);
+                    }
                   }}
                 >
-                  <h2 className="font-semibold text-slate-100 text-sm sm:text-base group-hover:text-indigo-400 transition-colors">
+                  <h2 className="font-semibold text-foreground text-sm sm:text-base group-hover:text-primary transition-colors">
                     {chatTitle}
                   </h2>
-                  <div className="text-xs text-slate-400 flex items-center gap-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
                     {isOtherTyping ? (
-                      <span className="text-indigo-400">{getTypingText()}</span>
+                      <span className="text-primary">{getTypingText()}</span>
                     ) : (
                       getSubTitleText()
                     )}
@@ -620,91 +692,101 @@ export function ChatLayout() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-slate-400 hover:text-indigo-400 hidden sm:flex"
+                  className="text-muted-foreground hover:text-primary hidden sm:flex"
                 >
                   <Phone className="w-5 h-5" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-slate-400 hover:text-indigo-400 hidden sm:flex"
+                  className="text-muted-foreground hover:text-primary hidden sm:flex"
                 >
                   <Video className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="text-slate-400">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground"
+                >
                   <MoreVertical className="w-5 h-5" />
                 </Button>
               </div>
             </div>
 
             {/* Messages Area */}
-            <div 
+            <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar bg-gradient-to-b from-transparent to-slate-900/20"
+              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar bg-gradient-to-b from-transparent to-secondary/15"
             >
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
-                  <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
                 </div>
               ) : messages.length > 0 ? (
                 <>
                   {isLoadingMore && (
                     <div className="flex justify-center items-center py-2 animate-fadeIn">
-                      <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
                     </div>
                   )}
                   {messages.map((msg, index) => {
                     const senderIdStr = getMessageSenderId(msg);
                     const isMe = senderIdStr === authUser?._id;
-                    const prevSenderIdStr = index > 0 ? getMessageSenderId(messages[index - 1]) : null;
+                    const prevSenderIdStr =
+                      index > 0
+                        ? getMessageSenderId(messages[index - 1])
+                        : null;
                     const showAvatar =
-                      index === 0 ||
-                      prevSenderIdStr !== senderIdStr;
-                    const sender = activeConversation.members?.find((m) => m._id === senderIdStr);
+                      index === 0 || prevSenderIdStr !== senderIdStr;
+                    const sender = activeConversation.members?.find(
+                      (m) => m._id === senderIdStr,
+                    );
 
                     return (
-                        <Motion.div
-                          id={msg._id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          key={msg._id}
-                          onContextMenu={(e) => { 
-                            e.preventDefault(); 
-                            setContextMenuMsgId(msg._id);
-                          }}
-                          className={cn(
-                            "flex w-full relative",
-                            isMe ? "justify-end" : "justify-start",
-                          )}
-                        >
-                          <AnimatePresence>
-                            {contextMenuMsgId === msg._id && (
-                              <Motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                transition={{ duration: 0.1 }}
-                                className={cn(
-                                  "absolute z-50 bottom-full mb-1 min-w-[180px] bg-[#1E293B] border border-slate-700/60 shadow-xl rounded-xl py-1 overflow-hidden backdrop-blur-xl",
-                                  isMe ? "right-8" : "left-8"
-                                )}
-                                onClick={(e) => e.stopPropagation()}
+                      <Motion.div
+                        id={msg._id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        key={msg._id}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenuMsgId(msg._id);
+                        }}
+                        className={cn(
+                          "flex w-full relative",
+                          isMe ? "justify-end" : "justify-start",
+                        )}
+                      >
+                        <AnimatePresence>
+                          {contextMenuMsgId === msg._id && (
+                            <Motion.div
+                              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                              transition={{ duration: 0.1 }}
+                              className={cn(
+                                "absolute z-50 bottom-full mb-1 min-w-[180px] bg-[#1E293B] border border-slate-700/60 shadow-xl rounded-xl py-1 overflow-hidden backdrop-blur-xl",
+                                isMe ? "right-8" : "left-8",
+                              )}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                onClick={() => {
+                                  deleteMessageForMe(msg._id);
+                                  setContextMenuMsgId(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
                               >
-                                <button
-                                  onClick={() => {
-                                    deleteMessageForMe(msg._id);
-                                    setContextMenuMsgId(null);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
-                                >
-                                  <Trash2 className="w-4 h-4 text-slate-400" />
-                                  Delete for me
-                                </button>
-                                
-                                {getMessageSenderId(msg) === authUser?._id && 
-                                 currentTime > 0 &&
-                                 (currentTime - new Date(msg.createdAt).getTime() < 15 * 60 * 1000) && (
+                                <Trash2 className="w-4 h-4 text-slate-400" />
+                                Delete for me
+                              </button>
+
+                              {getMessageSenderId(msg) === authUser?._id &&
+                                currentTime > 0 &&
+                                currentTime -
+                                  new Date(msg.createdAt).getTime() <
+                                  15 * 60 * 1000 && (
                                   <button
                                     onClick={() => {
                                       setEditingMessageId(msg._id);
@@ -718,20 +800,22 @@ export function ChatLayout() {
                                   </button>
                                 )}
 
-                                <button
-                                  onClick={() => {
-                                    setReplyingToMessage(msg);
-                                    setContextMenuMsgId(null);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
-                                >
-                                  <CornerUpLeft className="w-4 h-4 text-slate-400" />
-                                  Reply
-                                </button>
+                              <button
+                                onClick={() => {
+                                  setReplyingToMessage(msg);
+                                  setContextMenuMsgId(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
+                              >
+                                <CornerUpLeft className="w-4 h-4 text-slate-400" />
+                                Reply
+                              </button>
 
-                                {getMessageSenderId(msg) === authUser?._id && 
-                                 currentTime > 0 &&
-                                 (currentTime - new Date(msg.createdAt).getTime() < 60 * 60 * 1000) && (
+                              {getMessageSenderId(msg) === authUser?._id &&
+                                currentTime > 0 &&
+                                currentTime -
+                                  new Date(msg.createdAt).getTime() <
+                                  60 * 60 * 1000 && (
                                   <button
                                     onClick={() => {
                                       deleteMessageForEveryone(msg._id);
@@ -743,9 +827,9 @@ export function ChatLayout() {
                                     Delete for everyone
                                   </button>
                                 )}
-                              </Motion.div>
-                            )}
-                          </AnimatePresence>
+                            </Motion.div>
+                          )}
+                        </AnimatePresence>
                         <div
                           className={cn(
                             "flex max-w-[85%] sm:max-w-[70%] gap-2 sm:gap-3",
@@ -755,7 +839,11 @@ export function ChatLayout() {
                           {showAvatar ? (
                             <div className="shrink-0 mt-auto">
                               <Avatar
-                                src={isMe ? getAvatarUrl(authUser) : getAvatarUrl(sender)}
+                                src={
+                                  isMe
+                                    ? getAvatarUrl(authUser)
+                                    : getAvatarUrl(sender)
+                                }
                                 size="sm"
                               />
                             </div>
@@ -769,29 +857,35 @@ export function ChatLayout() {
                               isMe ? "items-end" : "items-start",
                             )}
                           >
-                            {!isMe && activeConversation.isGroupChat && showAvatar && (
-                              <span className="text-xs text-slate-400 mb-1 ml-1 font-medium">
-                                {sender?.fullName || "Unknown Member"}
-                              </span>
-                            )}
+                            {!isMe &&
+                              activeConversation.isGroupChat &&
+                              showAvatar && (
+                                <span className="text-xs text-muted-foreground mb-1 ml-1 font-medium">
+                                  {sender?.fullName || "Unknown Member"}
+                                </span>
+                              )}
                             <div
                               className={cn(
                                 "px-4 py-2.5 rounded-2xl shadow-sm flex flex-col gap-2 relative group",
                                 isMe
-                                  ? "bg-indigo-600 text-white rounded-br-sm shadow-indigo-600/10"
-                                  : "bg-[#1E293B] text-slate-200 rounded-bl-sm border border-slate-800/50",
+                                  ? "bg-primary text-primary-foreground rounded-br-sm shadow-sm"
+                                  : "bg-secondary text-secondary-foreground rounded-bl-sm border border-border",
                               )}
                             >
                               {/* Floating Reaction Menu */}
-                              <div className={cn(
-                                "group-hover:flex absolute -top-10 hidden bg-[#1E293B] border border-slate-700 p-1.5 rounded-full shadow-xl gap-1 z-20 transition-all",
-                                isMe ? "right-0" : "left-0"
-                              )}>
-                                {REACTION_EMOJIS.map(emoji => (
+                              <div
+                                className={cn(
+                                  "group-hover:flex absolute -top-10 hidden bg-card border border-border p-1.5 rounded-full shadow-xl gap-1 z-20 transition-all",
+                                  isMe ? "right-0" : "left-0",
+                                )}
+                              >
+                                {REACTION_EMOJIS.map((emoji) => (
                                   <button
                                     key={emoji}
-                                    onClick={() => sendToggleReaction(msg._id, emoji)}
-                                    className="hover:bg-slate-700/50 rounded-full w-7 h-7 flex items-center justify-center transition-transform hover:scale-110 text-lg cursor-pointer"
+                                    onClick={() =>
+                                      sendToggleReaction(msg._id, emoji)
+                                    }
+                                    className="hover:bg-secondary rounded-full w-7 h-7 flex items-center justify-center transition-transform hover:scale-110 text-lg cursor-pointer"
                                   >
                                     {emoji}
                                   </button>
@@ -799,19 +893,32 @@ export function ChatLayout() {
                               </div>
                               {msg.replyTo && (
                                 <div
-                                  onClick={() => handleScrollToParent(msg.replyTo._id)}
+                                  onClick={() =>
+                                    handleScrollToParent(msg.replyTo._id)
+                                  }
                                   className={cn(
                                     "mb-1 p-2 rounded bg-black/10 border-l-2 cursor-pointer transition-colors hover:bg-black/20",
-                                    isMe ? "border-indigo-300" : "border-slate-500"
+                                    isMe
+                                      ? "border-primary-foreground/40"
+                                      : "border-muted-foreground/40",
                                   )}
                                 >
                                   <p className="text-xs font-semibold opacity-80 mb-0.5">
-                                    {typeof msg.replyTo.senderId === 'object' 
+                                    {typeof msg.replyTo.senderId === "object"
                                       ? msg.replyTo.senderId?.fullName || "User"
-                                      : activeConversation.members?.find(m => m._id === msg.replyTo.senderId)?.fullName || "User"}
+                                      : activeConversation.members?.find(
+                                          (m) => m._id === msg.replyTo.senderId,
+                                        )?.fullName || "User"}
                                   </p>
                                   <p className="text-xs opacity-70 truncate max-w-[200px] sm:max-w-[300px]">
-                                    {msg.replyTo.text || (msg.replyTo.image ? "📷 Image" : msg.replyTo.audio?.url ? "🎵 Audio" : msg.replyTo.document?.url ? "📎 Document" : "Attachment")}
+                                    {msg.replyTo.text ||
+                                      (msg.replyTo.image
+                                        ? "📷 Image"
+                                        : msg.replyTo.audio?.url
+                                          ? "🎵 Audio"
+                                          : msg.replyTo.document?.url
+                                            ? "📎 Document"
+                                            : "Attachment")}
                                   </p>
                                 </div>
                               )}
@@ -820,23 +927,33 @@ export function ChatLayout() {
                                   src={msg.image}
                                   alt="Attachment"
                                   className="sm:max-w-[200px] rounded-md object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                  onClick={() => setSelectedImageModal(msg.image)}
+                                  onClick={() =>
+                                    setSelectedImageModal(msg.image)
+                                  }
                                 />
                               )}
                               {msg.audio?.url && (
                                 <div className="flex flex-col gap-1.5 min-w-[220px] max-w-[280px]">
                                   <div className="flex items-center gap-2 text-xs opacity-70">
                                     <Music className="w-3.5 h-3.5 shrink-0" />
-                                    <span className="truncate">{msg.audio.name || "Audio"}</span>
+                                    <span className="truncate">
+                                      {msg.audio.name || "Audio"}
+                                    </span>
                                   </div>
                                   <audio
                                     controls
                                     preload="metadata"
                                     className="w-full h-8 rounded-lg"
-                                    style={{ filter: isMe ? "invert(1) hue-rotate(180deg) brightness(0.85)" : "invert(1) hue-rotate(180deg) brightness(0.7)" }}
+                                    style={{
+                                      filter:
+                                        theme === "dark"
+                                          ? "invert(1) hue-rotate(180deg) brightness(0.85)"
+                                          : "none",
+                                    }}
                                   >
                                     <source src={msg.audio.url} />
-                                    Your browser does not support audio playback.
+                                    Your browser does not support audio
+                                    playback.
                                   </audio>
                                 </div>
                               )}
@@ -848,15 +965,17 @@ export function ChatLayout() {
                                   className={cn(
                                     "flex items-center gap-3 px-3 py-2.5 rounded-xl min-w-[200px] max-w-[280px] transition-colors group/doc",
                                     isMe
-                                      ? "bg-indigo-700/40 hover:bg-indigo-700/60"
-                                      : "bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/40"
+                                      ? "bg-primary/20 hover:bg-primary/30"
+                                      : "bg-secondary/60 hover:bg-secondary border border-border",
                                   )}
                                 >
-                                  <div className={cn(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-                                    isMe ? "bg-indigo-500/30" : "bg-indigo-500/20"
-                                  )}>
-                                    <FileText className="w-5 h-5 text-indigo-300" />
+                                  <div
+                                    className={cn(
+                                      "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                                      isMe ? "bg-primary/30" : "bg-primary/20",
+                                    )}
+                                  >
+                                    <FileText className="w-5 h-5 text-primary" />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">
@@ -876,80 +995,129 @@ export function ChatLayout() {
                                 </a>
                               )}
                               {msg.deletedForEveryone ? (
-                                 <div className="text-sm italic text-slate-400">Message deleted</div>
-                               ) : editingMessageId === msg._id ? (
-                                 <div className="flex flex-col gap-2 min-w-[200px]">
-                                   <input
-                                     type="text"
-                                     value={editMessageText}
-                                     onChange={(e) => setEditMessageText(e.target.value)}
-                                     onKeyDown={async (e) => {
-                                       if (e.key === "Enter") {
-                                         e.preventDefault();
-                                         if (editMessageText.trim() && editMessageText !== msg.text) {
-                                           await editMessage(msg._id, editMessageText);
-                                         }
-                                         setEditingMessageId(null);
-                                       } else if (e.key === "Escape") {
-                                         setEditingMessageId(null);
-                                       }
-                                     }}
-                                     autoFocus
-                                     className={cn(
-                                       "text-[15px] bg-[#0F172A]/50 text-white rounded-md px-2 py-1 outline-none border transition-colors",
-                                       isMe ? "border-indigo-400 focus:border-white" : "border-slate-600 focus:border-indigo-400"
-                                     )}
-                                   />
-                                   <div className="flex justify-end gap-2 text-xs">
-                                     <button onClick={() => setEditingMessageId(null)} className="text-slate-300 hover:text-white transition-colors">Cancel</button>
-                                     <button onClick={async () => {
-                                        if (editMessageText.trim() && editMessageText !== msg.text) {
-                                          await editMessage(msg._id, editMessageText);
+                                <div className="text-sm italic text-muted-foreground">
+                                  Message deleted
+                                </div>
+                              ) : editingMessageId === msg._id ? (
+                                <div className="flex flex-col gap-2 min-w-[200px]">
+                                  <input
+                                    type="text"
+                                    value={editMessageText}
+                                    onChange={(e) =>
+                                      setEditMessageText(e.target.value)
+                                    }
+                                    onKeyDown={async (e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        if (
+                                          editMessageText.trim() &&
+                                          editMessageText !== msg.text
+                                        ) {
+                                          await editMessage(
+                                            msg._id,
+                                            editMessageText,
+                                          );
                                         }
                                         setEditingMessageId(null);
-                                     }} className="text-white font-medium hover:text-indigo-200 transition-colors">Save</button>
-                                   </div>
-                                 </div>
-                               ) : (
-                                 msg.text && (
-                                   <div className="flex flex-col">
-                                     <p className="text-[15px] leading-relaxed break-words">
-                                       {msg.text}
-                                     </p>
-                                     {msg.isEdited && <span className="text-[10px] opacity-70 mt-0.5">(edited)</span>}
-                                   </div>
-                                 )
-                               )}
+                                      } else if (e.key === "Escape") {
+                                        setEditingMessageId(null);
+                                      }
+                                    }}
+                                    autoFocus
+                                    className={cn(
+                                      "text-[15px] bg-input/50 text-foreground rounded-md px-2 py-1 outline-none border transition-colors",
+                                      isMe
+                                        ? "border-primary-foreground/45 focus:border-primary-foreground"
+                                        : "border-border focus:border-primary",
+                                    )}
+                                  />
+                                  <div className="flex justify-end gap-2 text-xs">
+                                    <button
+                                      onClick={() => setEditingMessageId(null)}
+                                      className="text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        if (
+                                          editMessageText.trim() &&
+                                          editMessageText !== msg.text
+                                        ) {
+                                          await editMessage(
+                                            msg._id,
+                                            editMessageText,
+                                          );
+                                          {
+                                            convo.lastMessage ||
+                                              "No messages yet";
+                                          }
+                                        }
+                                        setEditingMessageId(null);
+                                      }}
+                                      className="text-white font-medium hover:text-indigo-200 transition-colors"
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (msg.type === "text" || msg.decryptedText != null) ? (
+                                <div className="flex flex-col">
+                                  <p className="text-[15px] leading-relaxed break-words">
+                                    {msg.decryptedText ?? msg.text ?? "[Unable to decrypt]"}
+                                  </p>
+                                  {msg.isEdited && (
+                                    <span className="text-[10px] opacity-70 mt-0.5">
+                                      (edited)
+                                    </span>
+                                  )}
+                                </div>
+                              ) : null}
                             </div>
 
                             {/* Active Reactions Container */}
                             {msg.reactions && msg.reactions.length > 0 && (
-                              <div className={cn(
-                                "flex flex-wrap gap-1 mt-1 z-10",
-                                isMe ? "justify-end pr-1" : "justify-start pl-1"
-                              )}>
+                              <div
+                                className={cn(
+                                  "flex flex-wrap gap-1 mt-1 z-10",
+                                  isMe
+                                    ? "justify-end pr-1"
+                                    : "justify-start pl-1",
+                                )}
+                              >
                                 {Object.entries(
                                   msg.reactions.reduce((acc, curr) => {
-                                    acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
+                                    acc[curr.emoji] =
+                                      (acc[curr.emoji] || 0) + 1;
                                     return acc;
-                                  }, {})
+                                  }, {}),
                                 ).map(([emoji, count]) => {
-                                  const hasReacted = msg.reactions.some(r => r.userId === authUser?._id && r.emoji === emoji);
+                                  const hasReacted = msg.reactions.some(
+                                    (r) =>
+                                      r.userId === authUser?._id &&
+                                      r.emoji === emoji,
+                                  );
                                   return (
                                     <button
                                       key={emoji}
-                                      onClick={() => sendToggleReaction(msg._id, emoji)}
+                                      onClick={() =>
+                                        sendToggleReaction(msg._id, emoji)
+                                      }
                                       className={cn(
                                         "flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border shadow-sm transition-all hover:scale-105 cursor-pointer",
-                                        hasReacted 
-                                          ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-300" 
-                                          : "bg-[#1E293B] border-slate-700/50 text-slate-300 hover:bg-slate-700/80"
+                                        hasReacted
+                                          ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-300"
+                                          : "bg-[#1E293B] border-slate-700/50 text-slate-300 hover:bg-slate-700/80",
                                       )}
                                     >
                                       <span>{emoji}</span>
-                                      {count > 1 && <span className="font-medium ml-0.5">{count}</span>}
+                                      {count > 1 && (
+                                        <span className="font-medium ml-0.5">
+                                          {count}
+                                        </span>
+                                      )}
                                     </button>
-                                  )
+                                  );
                                 })}
                               </div>
                             )}
@@ -983,123 +1151,144 @@ export function ChatLayout() {
                   })}
                 </>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-500">
+                <div className="flex items-center justify-center h-full text-muted-foreground">
                   <p className="text-sm">No messages yet. Say hello! 👋</p>
                 </div>
               )}
 
               {/* Typing indicators */}
-              {activeConversation && (
-                activeConversation.isGroupChat ? (
-                  typingUsers
-                    .filter(t => typeof t === "object" && t.convoId === activeConversation._id)
-                    .map(t => {
-                      const user = activeConversation.members?.find(m => m._id === t.userId);
-                      if (!user) return null;
-                      return (
-                        <div key={user._id} className="flex w-full justify-start mt-2">
-                          <div className="flex max-w-[70%] gap-3">
-                            <div className="shrink-0 mt-auto">
-                              <Avatar src={getAvatarUrl(user)} size="sm" />
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-[10px] text-slate-500 ml-1 mb-0.5">{user.fullName}</span>
-                              <div className="px-4 py-2.5 rounded-2xl bg-[#1E293B] text-slate-200 rounded-bl-sm border border-slate-800/50 flex items-center gap-1.5 h-9">
-                                <Motion.div
-                                  animate={{ y: [0, -3, 0] }}
-                                  transition={{
-                                    repeat: Infinity,
-                                    duration: 0.6,
-                                    delay: 0,
-                                  }}
-                                  className="w-1.5 h-1.5 bg-slate-400 rounded-full"
-                                />
-                                <Motion.div
-                                  animate={{ y: [0, -3, 0] }}
-                                  transition={{
-                                    repeat: Infinity,
-                                    duration: 0.6,
-                                    delay: 0.2,
-                                  }}
-                                  className="w-1.5 h-1.5 bg-slate-400 rounded-full"
-                                />
-                                <Motion.div
-                                  animate={{ y: [0, -3, 0] }}
-                                  transition={{
-                                    repeat: Infinity,
-                                    duration: 0.6,
-                                    delay: 0.4,
-                                  }}
-                                  className="w-1.5 h-1.5 bg-slate-400 rounded-full"
-                                />
+              {activeConversation &&
+                (activeConversation.isGroupChat
+                  ? typingUsers
+                      .filter(
+                        (t) =>
+                          typeof t === "object" &&
+                          t.convoId === activeConversation._id,
+                      )
+                      .map((t) => {
+                        const user = activeConversation.members?.find(
+                          (m) => m._id === t.userId,
+                        );
+                        if (!user) return null;
+                        return (
+                          <div
+                            key={user._id}
+                            className="flex w-full justify-start mt-2"
+                          >
+                            <div className="flex max-w-[70%] gap-3">
+                              <div className="shrink-0 mt-auto">
+                                <Avatar src={getAvatarUrl(user)} size="sm" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[10px] text-muted-foreground ml-1 mb-0.5">
+                                  {user.fullName}
+                                </span>
+                                <div className="px-4 py-2.5 rounded-2xl bg-secondary text-secondary-foreground rounded-bl-sm border border-border flex items-center gap-1.5 h-9">
+                                  <Motion.div
+                                    animate={{ y: [0, -3, 0] }}
+                                    transition={{
+                                      repeat: Infinity,
+                                      duration: 0.6,
+                                      delay: 0,
+                                    }}
+                                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                                  />
+                                  <Motion.div
+                                    animate={{ y: [0, -3, 0] }}
+                                    transition={{
+                                      repeat: Infinity,
+                                      duration: 0.6,
+                                      delay: 0.2,
+                                    }}
+                                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                                  />
+                                  <Motion.div
+                                    animate={{ y: [0, -3, 0] }}
+                                    transition={{
+                                      repeat: Infinity,
+                                      duration: 0.6,
+                                      delay: 0.4,
+                                    }}
+                                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })
-                ) : (
-                  isOtherTyping && (
-                    <div className="flex w-full justify-start mt-2">
-                      <div className="flex max-w-[70%] gap-3">
-                        <div className="shrink-0 mt-auto">
-                          <Avatar src={chatAvatar} size="sm" />
-                        </div>
-                        <div className="px-4 py-3.5 rounded-2xl bg-[#1E293B] text-slate-200 rounded-bl-sm border border-slate-800/50 flex items-center gap-1.5 h-11">
-                          <Motion.div
-                            animate={{ y: [0, -3, 0] }}
-                            transition={{
-                              repeat: Infinity,
-                              duration: 0.6,
-                              delay: 0,
-                            }}
-                            className="w-1.5 h-1.5 bg-slate-400 rounded-full"
-                          />
-                          <Motion.div
-                            animate={{ y: [0, -3, 0] }}
-                            transition={{
-                              repeat: Infinity,
-                              duration: 0.6,
-                              delay: 0.2,
-                            }}
-                            className="w-1.5 h-1.5 bg-slate-400 rounded-full"
-                          />
-                          <Motion.div
-                            animate={{ y: [0, -3, 0] }}
-                            transition={{
-                              repeat: Infinity,
-                              duration: 0.6,
-                              delay: 0.4,
-                            }}
-                            className="w-1.5 h-1.5 bg-slate-400 rounded-full"
-                          />
+                        );
+                      })
+                  : isOtherTyping && (
+                      <div className="flex w-full justify-start mt-2">
+                        <div className="flex max-w-[70%] gap-3">
+                          <div className="shrink-0 mt-auto">
+                            <Avatar src={chatAvatar} size="sm" />
+                          </div>
+                          <div className="px-4 py-3.5 rounded-2xl bg-secondary text-secondary-foreground rounded-bl-sm border border-border flex items-center gap-1.5 h-11">
+                            <Motion.div
+                              animate={{ y: [0, -3, 0] }}
+                              transition={{
+                                repeat: Infinity,
+                                duration: 0.6,
+                                delay: 0,
+                              }}
+                              className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                            />
+                            <Motion.div
+                              animate={{ y: [0, -3, 0] }}
+                              transition={{
+                                repeat: Infinity,
+                                duration: 0.6,
+                                delay: 0.2,
+                              }}
+                              className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                            />
+                            <Motion.div
+                              animate={{ y: [0, -3, 0] }}
+                              transition={{
+                                repeat: Infinity,
+                                duration: 0.6,
+                                delay: 0.4,
+                              }}
+                              className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                )
-              )}
+                    ))}
 
               <div ref={messagesEndRef} className="h-1" />
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-[#111827] border-t border-slate-800/60 shrink-0">
+            <div className="p-4 bg-card border-t border-border shrink-0">
               {replyingToMessage && (
-                <div className="mb-2 p-3 bg-slate-800/50 border-l-4 border-indigo-500 rounded-lg flex items-center justify-between max-w-4xl mx-auto animate-fadeIn">
+                <div className="mb-2 p-3 bg-secondary/40 border-l-4 border-primary rounded-lg flex items-center justify-between max-w-4xl mx-auto animate-fadeIn">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-indigo-400 mb-1">
-                      Replying to {getMessageSenderId(replyingToMessage) === authUser?._id 
-                        ? "yourself" 
-                        : (typeof replyingToMessage.senderId === 'object' ? replyingToMessage.senderId.fullName : activeConversation.members?.find(m => m._id === getMessageSenderId(replyingToMessage))?.fullName || "user")}
+                    <p className="text-xs font-semibold text-primary mb-1">
+                      Replying to{" "}
+                      {getMessageSenderId(replyingToMessage) === authUser?._id
+                        ? "yourself"
+                        : typeof replyingToMessage.senderId === "object"
+                          ? replyingToMessage.senderId.fullName
+                          : activeConversation.members?.find(
+                              (m) =>
+                                m._id === getMessageSenderId(replyingToMessage),
+                            )?.fullName || "user"}
                     </p>
-                    <p className="text-sm text-slate-300 truncate">
-                      {replyingToMessage.text || (replyingToMessage.image ? "📷 Image" : replyingToMessage.audio?.url ? "🎵 Audio" : replyingToMessage.document?.url ? "📎 Document" : "Attachment")}
+                    <p className="text-sm text-muted-foreground truncate">
+                      {replyingToMessage.text ||
+                        (replyingToMessage.image
+                          ? "📷 Image"
+                          : replyingToMessage.audio?.url
+                            ? "🎵 Audio"
+                            : replyingToMessage.document?.url
+                              ? "📎 Document"
+                              : "Attachment")}
                     </p>
                   </div>
-                  <button 
+                  <button
                     onClick={clearReplyingToMessage}
-                    className="p-1 ml-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition-colors"
+                    className="p-1 ml-2 text-muted-foreground hover:text-foreground hover:bg-secondary/40 rounded-full transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1108,41 +1297,51 @@ export function ChatLayout() {
               {mediaPreview && (
                 <div className="mb-3 mx-auto max-w-4xl animate-fadeIn">
                   {mediaPreviewType === "image" ? (
-                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-700 mx-auto">
-                      <img src={mediaPreview} alt="Preview" className="w-full h-full object-cover" />
-                      <button 
+                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border mx-auto">
+                      <img
+                        src={mediaPreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
                         onClick={removefile}
                         type="button"
-                        className="absolute top-1 right-1 w-6 h-6 bg-slate-900/80 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                        className="absolute top-1 right-1 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3 px-4 py-3 bg-slate-800/60 border border-slate-700/50 rounded-xl max-w-xs mx-auto">
-                      <div className={cn(
-                        "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-                        mediaPreviewType === "audio" ? "bg-emerald-500/20" : "bg-indigo-500/20"
-                      )}>
-                        {mediaPreviewType === "audio" 
-                          ? <Music className="w-5 h-5 text-emerald-400" />
-                          : <FileText className="w-5 h-5 text-indigo-400" />
-                        }
+                    <div className="flex items-center gap-3 px-4 py-3 bg-secondary/40 border border-border rounded-xl max-w-xs mx-auto">
+                      <div
+                        className={cn(
+                          "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                          mediaPreviewType === "audio"
+                            ? "bg-emerald-500/10"
+                            : "bg-primary/10",
+                        )}
+                      >
+                        {mediaPreviewType === "audio" ? (
+                          <Music className="w-5 h-5 text-emerald-500" />
+                        ) : (
+                          <FileText className="w-5 h-5 text-primary" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-200 font-medium truncate">{mediaPreview}</p>
-                        <p className="text-[11px] text-slate-500">
-                          {selectedFile && (
-                            selectedFile.size < 1024 * 1024
+                        <p className="text-sm text-foreground font-medium truncate">
+                          {mediaPreview}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {selectedFile &&
+                            (selectedFile.size < 1024 * 1024
                               ? `${(selectedFile.size / 1024).toFixed(1)} KB`
-                              : `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`
-                          )}
+                              : `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`)}
                         </p>
                       </div>
-                      <button 
+                      <button
                         onClick={removefile}
                         type="button"
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shrink-0"
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors shrink-0"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -1165,18 +1364,18 @@ export function ChatLayout() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="text-slate-400 hover:text-slate-300 hover:bg-slate-800 mb-1 shrink-0"
+                  className="text-muted-foreground hover:text-foreground hover:bg-secondary/40 mb-1 shrink-0"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Paperclip className="w-5 h-5" />
                 </Button>
 
-                <div className="flex-1 bg-[#0F172A] border border-slate-800/80 rounded-2xl flex items-end focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all shadow-inner shadow-black/10 relative">
+                <div className="flex-1 bg-input border border-border rounded-2xl flex items-end focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all shadow-inner shadow-black/5 relative">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="text-slate-400 hover:text-yellow-500 mb-1 ml-1 shrink-0"
+                    className="text-muted-foreground hover:text-yellow-600 mb-1 ml-1 shrink-0"
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   >
                     <Smile className="w-5 h-5" />
@@ -1185,7 +1384,7 @@ export function ChatLayout() {
                   {showEmojiPicker && (
                     <div className="absolute bottom-14 left-0 z-50">
                       <EmojiPicker
-                        theme="dark"
+                        theme={theme === "dark" ? "dark" : "light"}
                         onEmojiClick={(emojiData) => {
                           setMessageText((prev) => prev + emojiData.emoji);
                         }}
@@ -1197,7 +1396,7 @@ export function ChatLayout() {
                     value={messageText}
                     onChange={handleTyping}
                     placeholder="Type a message..."
-                    className="w-full bg-transparent text-slate-200 py-3 px-2 max-h-32 min-h-[44px] outline-none resize-none text-[15px] placeholder:text-slate-500 custom-scrollbar"
+                    className="w-full bg-transparent text-foreground py-3 px-2 max-h-32 min-h-[44px] outline-none resize-none text-[15px] placeholder:text-muted-foreground/60 custom-scrollbar"
                     rows={1}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
@@ -1214,9 +1413,9 @@ export function ChatLayout() {
                   disabled={!messageText.trim() && !selectedFile}
                   className={cn(
                     "mb-1 shrink-0 rounded-xl transition-all duration-200 h-11 w-11",
-                    (messageText.trim() || selectedFile)
-                      ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-600/20"
-                      : "bg-slate-800 text-slate-500",
+                    messageText.trim() || selectedFile
+                      ? "bg-primary text-primary-foreground hover:opacity-90 shadow-md shadow-primary/20"
+                      : "bg-secondary text-muted-foreground/60",
                   )}
                 >
                   <Send className="w-5 h-5 ml-1" />
@@ -1225,8 +1424,8 @@ export function ChatLayout() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center bg-gradient-to-b from-[#0F172A] to-[#111827]">
-            <div className="w-24 h-24 bg-slate-800/50 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-black/20 border border-slate-700/50">
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center bg-background">
+            <div className="w-24 h-24 bg-secondary rounded-full flex items-center justify-center mb-6 shadow-xl border border-border">
               <svg
                 width="40"
                 height="40"
@@ -1248,7 +1447,8 @@ export function ChatLayout() {
               Welcome, {authUser?.fullName}!
             </h3>
             <p className="max-w-md">
-              Search for users or create a group in the sidebar to start collaborating.
+              Search for users or create a group in the sidebar to start
+              collaborating.
             </p>
           </div>
         )}
@@ -1280,7 +1480,7 @@ export function ChatLayout() {
                 src={selectedImageModal}
                 alt="Fullscreen Attachment"
                 className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-                onClick={(e) => e.stopPropagation()} 
+                onClick={(e) => e.stopPropagation()}
               />
             </div>
           </Motion.div>
@@ -1312,8 +1512,12 @@ export function ChatLayout() {
               {/* Header */}
               <div className="p-4 border-b border-slate-800/60 flex items-center justify-between bg-slate-900/50">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-100 font-sans">Create Group Chat</h3>
-                  <p className="text-xs text-slate-500">Collaborate with multiple people</p>
+                  <h3 className="text-lg font-semibold text-slate-100 font-sans">
+                    Create Group Chat
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Collaborate with multiple people
+                  </p>
                 </div>
                 <Button
                   variant="ghost"
@@ -1334,7 +1538,9 @@ export function ChatLayout() {
               <div className="p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                 {/* Group Name input */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Group Name</label>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Group Name
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. Project Avengers 🚀"
@@ -1351,19 +1557,28 @@ export function ChatLayout() {
                       Selected Members ({selectedGroupMembers.length})
                     </label>
                     <div className="flex flex-wrap gap-1.5 p-2 bg-[#0F172A]/50 rounded-lg border border-slate-800/40 max-h-24 overflow-y-auto custom-scrollbar">
-                      {selectedGroupMembers.map(memberId => {
-                        const member = groupSearchResults.find(m => m._id === memberId) || 
-                                       conversations.flatMap(c => c.members).find(m => m._id === memberId);
+                      {selectedGroupMembers.map((memberId) => {
+                        const member =
+                          groupSearchResults.find((m) => m._id === memberId) ||
+                          conversations
+                            .flatMap((c) => c.members)
+                            .find((m) => m._id === memberId);
                         if (!member) return null;
                         return (
-                          <div 
-                            key={memberId} 
+                          <div
+                            key={memberId}
                             className="flex items-center gap-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs px-2.5 py-1 rounded-full animate-fadeIn"
                           >
                             <span>{member.fullName}</span>
                             <button
                               type="button"
-                              onClick={() => setSelectedGroupMembers(selectedGroupMembers.filter(id => id !== memberId))}
+                              onClick={() =>
+                                setSelectedGroupMembers(
+                                  selectedGroupMembers.filter(
+                                    (id) => id !== memberId,
+                                  ),
+                                )
+                              }
                               className="text-indigo-400 hover:text-indigo-200 transition-colors"
                             >
                               <X className="w-3 h-3" />
@@ -1377,7 +1592,9 @@ export function ChatLayout() {
 
                 {/* Member Search input */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Add Members</label>
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Add Members
+                  </label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input
@@ -1398,27 +1615,40 @@ export function ChatLayout() {
                     </div>
                   ) : groupSearchResults.length > 0 ? (
                     groupSearchResults.map((user) => {
-                      const isSelected = selectedGroupMembers.includes(user._id);
+                      const isSelected = selectedGroupMembers.includes(
+                        user._id,
+                      );
                       return (
                         <div
                           key={user._id}
                           onClick={() => {
                             if (isSelected) {
-                              setSelectedGroupMembers(selectedGroupMembers.filter(id => id !== user._id));
+                              setSelectedGroupMembers(
+                                selectedGroupMembers.filter(
+                                  (id) => id !== user._id,
+                                ),
+                              );
                             } else {
-                              setSelectedGroupMembers([...selectedGroupMembers, user._id]);
+                              setSelectedGroupMembers([
+                                ...selectedGroupMembers,
+                                user._id,
+                              ]);
                             }
                           }}
                           className={cn(
                             "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all border border-transparent",
-                            isSelected ? "bg-[#4F46E5]/10 border-[#4F46E5]/20" : "hover:bg-slate-800/40"
+                            isSelected
+                              ? "bg-[#4F46E5]/10 border-[#4F46E5]/20"
+                              : "hover:bg-slate-800/40",
                           )}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Avatar
                               src={getAvatarUrl(user)}
                               size="sm"
-                              status={isUserOnline(user._id) ? "online" : "offline"}
+                              status={
+                                isUserOnline(user._id) ? "online" : "offline"
+                              }
                             />
                             <div className="min-w-0">
                               <h4 className="text-xs font-medium text-slate-200 truncate">
@@ -1429,18 +1659,26 @@ export function ChatLayout() {
                               </p>
                             </div>
                           </div>
-                          
-                          <div className={cn(
-                            "w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0",
-                            isSelected ? "bg-indigo-600 border-indigo-500 text-white" : "border-slate-700"
-                          )}>
-                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+
+                          <div
+                            className={cn(
+                              "w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0",
+                              isSelected
+                                ? "bg-indigo-600 border-indigo-500 text-white"
+                                : "border-slate-700",
+                            )}
+                          >
+                            {isSelected && (
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            )}
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <p className="text-center text-xs text-slate-600 py-6 font-sans">No users found</p>
+                    <p className="text-center text-xs text-slate-600 py-6 font-sans">
+                      No users found
+                    </p>
                   )}
                 </div>
               </div>
@@ -1471,7 +1709,10 @@ export function ChatLayout() {
                       return;
                     }
                     setIsCreatingGroup(true);
-                    const newGroup = await createGroupConversation(groupName.trim(), selectedGroupMembers);
+                    const newGroup = await createGroupConversation(
+                      groupName.trim(),
+                      selectedGroupMembers,
+                    );
                     setIsCreatingGroup(false);
                     if (newGroup) {
                       setIsCreateGroupOpen(false);
@@ -1529,127 +1770,197 @@ export function ChatLayout() {
 
               <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="flex flex-col items-center gap-3 mb-6">
-                   {/* Group Avatar — click to change (admin only) */}
-                   <div className="relative group/avatar">
-                     <Avatar size="xl" src={chatAvatar} className="w-20 h-20 ring-4 ring-slate-800" />
-                     {activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id) && (
-                       <>
-                         <input
-                           type="file"
-                           accept="image/*"
-                           ref={groupAvatarInputRef}
-                           className="hidden"
-                           onChange={async (e) => {
-                             const file = e.target.files?.[0];
-                             if (!file) return;
-                             if (file.size > 5 * 1024 * 1024) {
-                               toast.error("Image must be under 5MB");
-                               return;
-                             }
-                             const reader = new FileReader();
-                             reader.onloadend = () => {
-                               updateGroupMetadata(activeConversation._id, null, reader.result);
-                             };
-                             reader.readAsDataURL(file);
-                             e.target.value = "";
-                           }}
-                         />
-                         <button
-                           onClick={() => groupAvatarInputRef.current?.click()}
-                           className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                         >
-                           <Pencil className="w-4 h-4 text-white" />
-                         </button>
-                       </>
-                     )}
-                   </div>
+                  {/* Group Avatar — click to change (admin only) */}
+                  <div className="relative group/avatar">
+                    <Avatar
+                      size="xl"
+                      src={chatAvatar}
+                      className="w-20 h-20 ring-4 ring-slate-800"
+                    />
+                    {activeConversation.groupAdmins?.some(
+                      (a) => (a._id || a) === authUser?._id,
+                    ) && (
+                      <>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={groupAvatarInputRef}
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 5 * 1024 * 1024) {
+                              toast.error("Image must be under 5MB");
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              updateGroupMetadata(
+                                activeConversation._id,
+                                null,
+                                reader.result,
+                              );
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value = "";
+                          }}
+                        />
+                        <button
+                          onClick={() => groupAvatarInputRef.current?.click()}
+                          className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                        >
+                          <Pencil className="w-4 h-4 text-white" />
+                        </button>
+                      </>
+                    )}
+                  </div>
 
-                   {/* Group Name — click to edit (admin only) */}
-                   {isEditingGroupName ? (
-                     <input
-                       autoFocus
-                       value={editGroupNameText}
-                       onChange={(e) => setEditGroupNameText(e.target.value)}
-                       onKeyDown={(e) => {
-                         if (e.key === "Enter" && editGroupNameText.trim()) {
-                           updateGroupMetadata(activeConversation._id, editGroupNameText.trim(), null);
-                           setIsEditingGroupName(false);
-                         } else if (e.key === "Escape") {
-                           setIsEditingGroupName(false);
-                         }
-                       }}
-                       onBlur={() => {
-                         if (editGroupNameText.trim() && editGroupNameText.trim() !== chatTitle) {
-                           updateGroupMetadata(activeConversation._id, editGroupNameText.trim(), null);
-                         }
-                         setIsEditingGroupName(false);
-                       }}
-                       className="text-xl font-bold text-white bg-slate-800/60 border border-indigo-500 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full max-w-[260px]"
-                     />
-                   ) : (
-                     <h3
-                       className={`text-xl font-bold text-white ${activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id) ? "cursor-pointer hover:text-indigo-400 transition-colors" : ""}`}
-                       onClick={() => {
-                         if (activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id)) {
-                           setEditGroupNameText(chatTitle);
-                           setIsEditingGroupName(true);
-                         }
-                       }}
-                       title={activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id) ? "Click to edit group name" : undefined}
-                     >
-                       {chatTitle}
-                       {activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id) && (
-                         <Pencil className="w-3 h-3 inline ml-2 text-slate-500" />
-                       )}
-                     </h3>
-                   )}
+                  {/* Group Name — click to edit (admin only) */}
+                  {isEditingGroupName ? (
+                    <input
+                      autoFocus
+                      value={editGroupNameText}
+                      onChange={(e) => setEditGroupNameText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editGroupNameText.trim()) {
+                          updateGroupMetadata(
+                            activeConversation._id,
+                            editGroupNameText.trim(),
+                            null,
+                          );
+                          setIsEditingGroupName(false);
+                        } else if (e.key === "Escape") {
+                          setIsEditingGroupName(false);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (
+                          editGroupNameText.trim() &&
+                          editGroupNameText.trim() !== chatTitle
+                        ) {
+                          updateGroupMetadata(
+                            activeConversation._id,
+                            editGroupNameText.trim(),
+                            null,
+                          );
+                        }
+                        setIsEditingGroupName(false);
+                      }}
+                      className="text-xl font-bold text-white bg-slate-800/60 border border-indigo-500 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full max-w-[260px]"
+                    />
+                  ) : (
+                    <h3
+                      className={`text-xl font-bold text-white ${activeConversation.groupAdmins?.some((a) => (a._id || a) === authUser?._id) ? "cursor-pointer hover:text-indigo-400 transition-colors" : ""}`}
+                      onClick={() => {
+                        if (
+                          activeConversation.groupAdmins?.some(
+                            (a) => (a._id || a) === authUser?._id,
+                          )
+                        ) {
+                          setEditGroupNameText(chatTitle);
+                          setIsEditingGroupName(true);
+                        }
+                      }}
+                      title={
+                        activeConversation.groupAdmins?.some(
+                          (a) => (a._id || a) === authUser?._id,
+                        )
+                          ? "Click to edit group name"
+                          : undefined
+                      }
+                    >
+                      {chatTitle}
+                      {activeConversation.groupAdmins?.some(
+                        (a) => (a._id || a) === authUser?._id,
+                      ) && (
+                        <Pencil className="w-3 h-3 inline ml-2 text-slate-500" />
+                      )}
+                    </h3>
+                  )}
 
-                   <p className="text-sm text-slate-400">{activeConversation.members?.length} Members</p>
+                  <p className="text-sm text-slate-400">
+                    {activeConversation.members?.length} Members
+                  </p>
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-2">Members</h4>
+                  <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                    Members
+                  </h4>
                   {activeConversation.members?.map((member) => {
-                    const isAdmin = activeConversation.groupAdmins?.some(a => (a._id || a) === member._id);
+                    const isAdmin = activeConversation.groupAdmins?.some(
+                      (a) => (a._id || a) === member._id,
+                    );
                     const isMe = member._id === authUser?._id;
-                    const amIAdmin = activeConversation.groupAdmins?.some(a => (a._id || a) === authUser?._id);
+                    const amIAdmin = activeConversation.groupAdmins?.some(
+                      (a) => (a._id || a) === authUser?._id,
+                    );
 
                     return (
-                      <div key={member._id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 hover:bg-slate-800/60 transition-colors">
+                      <div
+                        key={member._id}
+                        className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 hover:bg-slate-800/60 transition-colors"
+                      >
                         <div className="flex items-center gap-3">
-                          <Avatar src={getAvatarUrl(member)} status={isUserOnline(member._id) ? "online" : "offline"} />
+                          <Avatar
+                            src={getAvatarUrl(member)}
+                            status={
+                              isUserOnline(member._id) ? "online" : "offline"
+                            }
+                          />
                           <div>
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-medium text-slate-200">
-                                {member.fullName} {isMe && <span className="text-xs text-indigo-400 font-normal">(You)</span>}
+                                {member.fullName}{" "}
+                                {isMe && (
+                                  <span className="text-xs text-indigo-400 font-normal">
+                                    (You)
+                                  </span>
+                                )}
                               </p>
-                              {isAdmin && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border border-indigo-500/30">Admin</span>}
+                              {isAdmin && (
+                                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border border-indigo-500/30">
+                                  Admin
+                                </span>
+                              )}
                             </div>
-                            <p className="text-xs text-slate-500">@{member.username}</p>
+                            <p className="text-xs text-slate-500">
+                              @{member.username}
+                            </p>
                           </div>
                         </div>
 
                         {/* Admin Controls */}
                         {amIAdmin && !isMe && (
                           <div className="flex gap-1">
-                             {!isAdmin && (
-                               <Button
-                                 size="sm"
-                                 variant="ghost"
-                                 className="h-7 text-xs text-indigo-400 hover:text-white hover:bg-indigo-500/20"
-                                 onClick={() => promoteToAdmin(activeConversation._id, member._id)}
-                               >
-                                 Promote
-                               </Button>
-                             )}
-                             <Button
-                               size="sm"
-                               variant="ghost"
-                               className="h-7 text-xs text-red-400 hover:text-white hover:bg-red-500/20"
-                               onClick={() => removeGroupMember(activeConversation._id, member._id)}
-                             >
-                               Remove
-                             </Button>
+                            {!isAdmin && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs text-indigo-400 hover:text-white hover:bg-indigo-500/20"
+                                onClick={() =>
+                                  promoteToAdmin(
+                                    activeConversation._id,
+                                    member._id,
+                                  )
+                                }
+                              >
+                                Promote
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs text-red-400 hover:text-white hover:bg-red-500/20"
+                              onClick={() =>
+                                removeGroupMember(
+                                  activeConversation._id,
+                                  member._id,
+                                )
+                              }
+                            >
+                              Remove
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -1675,12 +1986,18 @@ export function ChatLayout() {
         .custom-scrollbar:hover::-webkit-scrollbar-thumb {
           background-color: #475569;
         }
-        
+
         @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
         }
-        
+
         .animate-fadeIn {
           animation: fadeIn 0.15s ease-out forwards;
         }
@@ -1690,11 +2007,14 @@ export function ChatLayout() {
         }
 
         @keyframes pulseHighlight {
-          0% { background-color: rgba(79, 70, 229, 0.4); }
-          100% { background-color: transparent; }
+          0% {
+            background-color: rgba(79, 70, 229, 0.4);
+          }
+          100% {
+            background-color: transparent;
+          }
         }
       `}</style>
     </div>
   );
 }
-

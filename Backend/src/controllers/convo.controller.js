@@ -7,246 +7,313 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
 const emitGroupEvent = (members, event, payload) => {
-    members.forEach(member => {
-        const memberIdStr = member._id ? member._id.toString() : member.toString();
-        const socketIds = getReceiverSocketIds(memberIdStr);
-        socketIds.forEach(socketId => {
-            io.to(socketId).emit(event, payload);
-        });
+  members.forEach((member) => {
+    const memberIdStr = member._id ? member._id.toString() : member.toString();
+    const socketIds = getReceiverSocketIds(memberIdStr);
+    socketIds.forEach((socketId) => {
+      io.to(socketId).emit(event, payload);
     });
+  });
 };
 
-
 const createConvo = asyncHandler(async (req, res) => {
-    const { receiverId } = req.body;
-    const senderId = req.user._id;
+  const { receiverId } = req.body;
+  const senderId = req.user._id;
 
-    if (!receiverId) {
-        throw new ApiError(400, "Receiver ID is required")
-    }
+  if (!receiverId) {
+    throw new ApiError(400, "Receiver ID is required");
+  }
 
-    if (senderId.toString() === receiverId.toString()) {
-        throw new ApiError(400, "You cannot create a conversation with yourself")
-    }
+  if (senderId.toString() === receiverId.toString()) {
+    throw new ApiError(400, "You cannot create a conversation with yourself");
+  }
 
-    let conversation = await Conversation.findOne({
-        members: { $all: [senderId, receiverId] }
-    }).populate("members", "fullName username email avatar lastSeen")
+  let conversation = await Conversation.findOne({
+    members: { $all: [senderId, receiverId] },
+  }).populate("members", "fullName username email avatar lastSeen");
 
-    if (!conversation) {
-        conversation = await Conversation.create({
-            members: [senderId, receiverId]
-        })
-        conversation = await conversation.populate("members", "fullName username email avatar lastSeen")
-    }
+  if (!conversation) {
+    conversation = await Conversation.create({
+      members: [senderId, receiverId],
+    });
+    conversation = await conversation.populate(
+      "members",
+      "fullName username email avatar lastSeen",
+    );
+  }
 
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(200, conversation, "Conversation created successfully")
-        )
-})
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, conversation, "Conversation created successfully"),
+    );
+});
 
 // 1. Instantiates a production-ready group context
 const createGroupChat = asyncHandler(async (req, res) => {
-    const { name, memberIds } = req.body;
-    const creatorId = req.user._id;
+  const { name, memberIds } = req.body;
+  const creatorId = req.user._id;
 
-    if (!name || !memberIds || !Array.isArray(memberIds)) {
-        throw new ApiError(400, "Group name and an array of valid member IDs are mandatory fields");
-    }
+  if (!name || !memberIds || !Array.isArray(memberIds)) {
+    throw new ApiError(
+      400,
+      "Group name and an array of valid member IDs are mandatory fields",
+    );
+  }
 
-    if (memberIds.length < 1) {
-        throw new ApiError(400, "A group requires at least one other member");
-    }
+  if (memberIds.length < 1) {
+    throw new ApiError(400, "A group requires at least one other member");
+  }
 
-    // Deduplicate members list and ensure creator is explicitly present
-    const uniqueMembers = [...new Set([...memberIds, creatorId.toString()])];
+  // Deduplicate members list and ensure creator is explicitly present
+  const uniqueMembers = [...new Set([...memberIds, creatorId.toString()])];
 
-    const newGroup = await Conversation.create({
-        isGroupChat: true,
-        groupName: name,
-        members: uniqueMembers,
-        groupAdmins: [creatorId]
-    });
+  const newGroup = await Conversation.create({
+    isGroupChat: true,
+    groupName: name,
+    members: uniqueMembers,
+    groupAdmins: [creatorId],
+  });
 
-    const fullyPopulatedGroup = await Conversation.findById(newGroup._id)
-        .populate("members", "fullName username email avatar lastSeen")
-        .populate("groupAdmins", "fullName username email avatar");
+  const fullyPopulatedGroup = await Conversation.findById(newGroup._id)
+    .populate("members", "fullName username email avatar lastSeen")
+    .populate("groupAdmins", "fullName username email avatar");
 
-    await GroupAuditLog.create({
-        convoId: fullyPopulatedGroup._id,
-        action: "GROUP_CREATED",
-        performedBy: creatorId,
-        description: `Group created by ${req.user?.fullName || "User"}`
-    });
+  await GroupAuditLog.create({
+    convoId: fullyPopulatedGroup._id,
+    action: "GROUP_CREATED",
+    performedBy: creatorId,
+    description: `Group created by ${req.user?.fullName || "User"}`,
+  });
 
-    return res.status(201).json(
-        new ApiResponse(201, fullyPopulatedGroup, "Group conversation created successfully")
+  return res
+    .status(201)
+    .json(
+      new ApiResponse(
+        201,
+        fullyPopulatedGroup,
+        "Group conversation created successfully",
+      ),
     );
 });
 
 // 2. Add members securely
 const addGroupMembers = asyncHandler(async (req, res) => {
-    const { newUserIds } = req.body;
-    const conversation = req.conversation; // Provided cleanly by verifyGroupAdmin middleware
+  const { newUserIds } = req.body;
+  const conversation = req.conversation; // Provided cleanly by verifyGroupAdmin middleware
 
-    if (!newUserIds || !Array.isArray(newUserIds)) {
-        throw new ApiError(400, "Target User IDs array is missing");
-    }
+  if (!newUserIds || !Array.isArray(newUserIds)) {
+    throw new ApiError(400, "Target User IDs array is missing");
+  }
 
-    // Use $addToSet to prevent duplicate item entries inside the array safely
-    const updatedGroup = await Conversation.findByIdAndUpdate(
-        conversation._id,
-        {
-            $addToSet: { members: { $each: newUserIds } }
-        },
-        { new: true }
-    ).populate("members", "fullName username email avatar lastSeen");
+  // Use $addToSet to prevent duplicate item entries inside the array safely
+  const updatedGroup = await Conversation.findByIdAndUpdate(
+    conversation._id,
+    {
+      $addToSet: { members: { $each: newUserIds } },
+    },
+    { new: true },
+  ).populate("members", "fullName username email avatar lastSeen");
 
-    await GroupAuditLog.create({
-        convoId: updatedGroup._id,
-        action: "MEMBER_ADDED",
-        performedBy: req.user._id,
-        description: `Added ${newUserIds.length} members`
-    });
+  await GroupAuditLog.create({
+    convoId: updatedGroup._id,
+    action: "MEMBER_ADDED",
+    performedBy: req.user._id,
+    description: `Added ${newUserIds.length} members`,
+  });
 
-    emitGroupEvent(updatedGroup.members, SOCKET_EVENTS.GROUP_MEMBER_ADDED, { convoId: updatedGroup._id, addedUserIds: newUserIds, updatedGroup });
+  emitGroupEvent(updatedGroup.members, SOCKET_EVENTS.GROUP_MEMBER_ADDED, {
+    convoId: updatedGroup._id,
+    addedUserIds: newUserIds,
+    updatedGroup,
+  });
 
-    return res.status(200).json(
-        new ApiResponse(200, updatedGroup, "New members added successfully")
-    );
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedGroup, "New members added successfully"));
 });
 
 // 3. Remove a member securely
 const removeGroupMember = asyncHandler(async (req, res) => {
-    const { targetUserId } = req.body;
-    const conversation = req.conversation;
+  const { targetUserId } = req.body;
+  const conversation = req.conversation;
 
-    if (!targetUserId) {
-        throw new ApiError(400, "Target User ID to remove must be specified");
-    }
+  if (!targetUserId) {
+    throw new ApiError(400, "Target User ID to remove must be specified");
+  }
 
-    // Prevent removing a user who is an admin unless they are explicitly demoted first
-    const isTargetAdmin = conversation.groupAdmins.some(
-        (adminId) => adminId.toString() === targetUserId.toString()
+  // Prevent removing a user who is an admin unless they are explicitly demoted first
+  const isTargetAdmin = conversation.groupAdmins.some(
+    (adminId) => adminId.toString() === targetUserId.toString(),
+  );
+
+  if (isTargetAdmin && conversation.groupAdmins.length === 1) {
+    throw new ApiError(
+      400,
+      "Cannot remove the sole administrator. Designate another admin before removal.",
     );
+  }
 
-    if (isTargetAdmin && conversation.groupAdmins.length === 1) {
-        throw new ApiError(400, "Cannot remove the sole administrator. Designate another admin before removal.");
-    }
+  const newKeyEpoch = conversation.keyEpoch + 1;
 
-    const updatedGroup = await Conversation.findByIdAndUpdate(
-        conversation._id,
-        {
-            $pull: {
-                members: targetUserId,
-                groupAdmins: targetUserId // Auto pull from admins array if present
-            }
-        },
-        { new: true }
-    ).populate("members", "fullName username email avatar lastSeen");
+  const updatedGroup = await Conversation.findByIdAndUpdate(
+    conversation._id,
+    {
+      $pull: {
+        members: targetUserId,
+        groupAdmins: targetUserId, // Auto pull from admins array if present
+      },
+      $set: {
+        keyEpoch: newKeyEpoch,
+      },
+    },
+    { new: true },
+  ).populate("members", "fullName username email avatar lastSeen");
 
-    await GroupAuditLog.create({
-        convoId: updatedGroup._id,
-        action: "MEMBER_REMOVED",
-        performedBy: req.user._id,
-        targetUser: targetUserId,
-        description: `Removed member`
-    });
+  await GroupAuditLog.create({
+    convoId: updatedGroup._id,
+    action: "MEMBER_REMOVED",
+    performedBy: req.user._id,
+    targetUser: targetUserId,
+    description: `Removed member`,
+  });
 
-    const allMembers = [...updatedGroup.members, { _id: targetUserId }];
-    emitGroupEvent(allMembers, SOCKET_EVENTS.GROUP_MEMBER_REMOVED, { convoId: updatedGroup._id, targetUserId });
+  const allMembers = [...updatedGroup.members, { _id: targetUserId }];
+  emitGroupEvent(allMembers, SOCKET_EVENTS.GROUP_MEMBER_REMOVED, {
+    convoId: updatedGroup._id,
+    targetUserId,
+  });
 
-    return res.status(200).json(
-        new ApiResponse(200, updatedGroup, "Target user ejected from group successfully")
+  // Notify remaining members that the group key epoch has advanced.
+  // This must happen after the member removal is persisted so the removed
+  // member is excluded from the new sender-key distribution.
+  emitGroupEvent(updatedGroup.members, SOCKET_EVENTS.GROUP_KEY_ROTATION_REQUIRED, {
+    convoId: updatedGroup._id,
+    newKeyEpoch,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        updatedGroup,
+        "Target user ejected from group successfully",
+      ),
     );
 });
 
 // 4. Elevate permissions via admin promotion
 const promoteToAdmin = asyncHandler(async (req, res) => {
-    const { targetUserId } = req.body;
-    const conversation = req.conversation;
+  const { targetUserId } = req.body;
+  const conversation = req.conversation;
 
-    const isMember = conversation.members.some(
-        (memberId) => memberId.toString() === targetUserId.toString()
+  const isMember = conversation.members.some(
+    (memberId) => memberId.toString() === targetUserId.toString(),
+  );
+
+  if (!isMember) {
+    throw new ApiError(
+      400,
+      "Target user is not currently an active member of this group",
     );
+  }
 
-    if (!isMember) {
-        throw new ApiError(400, "Target user is not currently an active member of this group");
-    }
+  const updatedGroup = await Conversation.findByIdAndUpdate(
+    conversation._id,
+    {
+      $addToSet: { groupAdmins: targetUserId },
+    },
+    { new: true },
+  ).populate("members groupAdmins", "fullName username email avatar");
 
-    const updatedGroup = await Conversation.findByIdAndUpdate(
-        conversation._id,
-        {
-            $addToSet: { groupAdmins: targetUserId }
-        },
-        { new: true }
-    ).populate("members groupAdmins", "fullName username email avatar");
+  await GroupAuditLog.create({
+    convoId: updatedGroup._id,
+    action: "ADMIN_PROMOTED",
+    performedBy: req.user._id,
+    targetUser: targetUserId,
+    description: `Promoted to admin`,
+  });
 
-    await GroupAuditLog.create({
-        convoId: updatedGroup._id,
-        action: "ADMIN_PROMOTED",
-        performedBy: req.user._id,
-        targetUser: targetUserId,
-        description: `Promoted to admin`
-    });
+  emitGroupEvent(updatedGroup.members, SOCKET_EVENTS.GROUP_ADMIN_PROMOTED, {
+    convoId: updatedGroup._id,
+    targetUserId,
+  });
 
-    emitGroupEvent(updatedGroup.members, SOCKET_EVENTS.GROUP_ADMIN_PROMOTED, { convoId: updatedGroup._id, targetUserId });
-
-    return res.status(200).json(
-        new ApiResponse(200, updatedGroup, "Member promoted to Group Administrator status successfully")
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        updatedGroup,
+        "Member promoted to Group Administrator status successfully",
+      ),
     );
 });
 
 // 5. Mutate Metadata (Name/Avatar)
 const updateGroupMetadata = asyncHandler(async (req, res) => {
-    const { groupName, groupAvatar } = req.body;
-    const conversation = req.conversation;
+  const { groupName, groupAvatar } = req.body;
+  const conversation = req.conversation;
 
-    const updatePayload = {};
-    if (groupName) updatePayload.groupName = groupName.trim();
-    if (groupAvatar) updatePayload.groupAvatar = groupAvatar;
+  const updatePayload = {};
+  if (groupName) updatePayload.groupName = groupName.trim();
+  if (groupAvatar) updatePayload.groupAvatar = groupAvatar;
 
-    if (Object.keys(updatePayload).length === 0) {
-        throw new ApiError(400, "No valid metadata updates were provided");
-    }
+  if (Object.keys(updatePayload).length === 0) {
+    throw new ApiError(400, "No valid metadata updates were provided");
+  }
 
-    const updatedGroup = await Conversation.findByIdAndUpdate(
-        conversation._id,
-        { $set: updatePayload },
-        { new: true }
-    ).populate("members groupAdmins", "fullName username email avatar");
+  const updatedGroup = await Conversation.findByIdAndUpdate(
+    conversation._id,
+    { $set: updatePayload },
+    { new: true },
+  ).populate("members groupAdmins", "fullName username email avatar");
 
-    await GroupAuditLog.create({
-        convoId: updatedGroup._id,
-        action: "METADATA_UPDATED",
-        performedBy: req.user._id,
-        description: `Updated group metadata`
-    });
+  await GroupAuditLog.create({
+    convoId: updatedGroup._id,
+    action: "METADATA_UPDATED",
+    performedBy: req.user._id,
+    description: `Updated group metadata`,
+  });
 
-    emitGroupEvent(updatedGroup.members, SOCKET_EVENTS.GROUP_METADATA_UPDATED, { convoId: updatedGroup._id, updatePayload });
+  emitGroupEvent(updatedGroup.members, SOCKET_EVENTS.GROUP_METADATA_UPDATED, {
+    convoId: updatedGroup._id,
+    updatePayload,
+  });
 
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(200, updatedGroup, "Group metadata properties updated successfully")
-        );
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        updatedGroup,
+        "Group metadata properties updated successfully",
+      ),
+    );
 });
 
 const getAllConvo = asyncHandler(async (req, res) => {
-    const conversations = await Conversation.find({
-        members: req.user._id
-    })
-        .populate("members", "fullName username email avatar lastSeen")
-        .populate("groupAdmins", "fullName username email avatar lastSeen")
-        .sort({ updatedAt: -1 })
+  const conversations = await Conversation.find({
+    members: req.user._id,
+  })
+    .populate("members", "fullName username email avatar lastSeen")
+    .populate("groupAdmins", "fullName username email avatar lastSeen")
+    .sort({ updatedAt: -1 });
 
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(200, conversations, "Conversations fetched successfully")
-        )
-})
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, conversations, "Conversations fetched successfully"),
+    );
+});
 
-export { createConvo, getAllConvo, createGroupChat, updateGroupMetadata, promoteToAdmin, removeGroupMember, addGroupMembers}
+export {
+  createConvo,
+  getAllConvo,
+  createGroupChat,
+  updateGroupMetadata,
+  promoteToAdmin,
+  removeGroupMember,
+  addGroupMembers,
+};
