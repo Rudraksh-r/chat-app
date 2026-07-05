@@ -7,6 +7,7 @@ import {
   Search,
   Plus,
   Settings,
+  Bell,
   MoreVertical,
   Phone,
   Video,
@@ -418,7 +419,7 @@ export function ChatLayout() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden font-sans">
+    <div className="flex h-screen w-full overflow-hidden font-sans text-foreground app-shell">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {!sidebarOpen && (
@@ -426,7 +427,7 @@ export function ChatLayout() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            className="fixed inset-0 bg-slate-950/25 z-40 md:hidden"
             onClick={() => setSidebarOpen(true)}
           />
         )}
@@ -435,12 +436,12 @@ export function ChatLayout() {
       {/* Sidebar */}
       <Motion.div
         className={cn(
-          "fixed md:relative z-50 flex flex-col w-80 h-full bg-card border-r border-border shrink-0 transition-transform duration-300 ease-in-out",
+          "fixed md:relative z-50 flex flex-col w-[320px] h-full shrink-0 transition-all duration-300 ease-out rounded-r-[32px] md:rounded-[28px] m-2 md:m-3 border border-border/70 glass-panel",
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
         {/* Sidebar Header */}
-        <div className="p-4 flex items-center justify-between border-b border-border">
+        <div className="p-4 flex items-center justify-between border-b border-border/70">
           <div className="flex items-center gap-3">
             <Avatar src={getAvatarUrl(authUser)} status="online" />
             <div>
@@ -454,7 +455,7 @@ export function ChatLayout() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-primary"
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
               onClick={toggleTheme}
             >
               {theme === "dark" ? (
@@ -467,7 +468,7 @@ export function ChatLayout() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
               >
                 <Settings className="w-4 h-4" />
               </Button>
@@ -475,7 +476,7 @@ export function ChatLayout() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               onClick={logout}
             >
               <LogOut className="w-4 h-4" />
@@ -483,7 +484,7 @@ export function ChatLayout() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground md:hidden"
+              className="h-8 w-8 rounded-full text-muted-foreground md:hidden"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-4 h-4" />
@@ -492,7 +493,7 @@ export function ChatLayout() {
         </div>
 
         {/* Search & Actions */}
-        <div className="p-4 space-y-4 border-b border-border">
+        <div className="p-4 space-y-4 border-b border-border/70">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -500,7 +501,7 @@ export function ChatLayout() {
               placeholder="Search users to start chatting..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-input text-sm text-foreground rounded-lg pl-9 pr-4 py-2 border border-border focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60"
+              className="w-full bg-input/80 text-sm text-foreground rounded-2xl pl-9 pr-4 py-2.5 border border-border/80 shadow-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
             />
           </div>
           <div className="flex justify-between items-center">
@@ -512,7 +513,7 @@ export function ChatLayout() {
                 onClick={() => setIsCreateGroupOpen(true)}
                 variant="ghost"
                 size="sm"
-                className="text-xs text-primary hover:opacity-80 flex items-center gap-1 h-7 px-2.5 bg-primary/10 hover:bg-primary/20 rounded-lg transition-all"
+                className="text-xs text-primary hover:opacity-80 flex items-center gap-1 h-8 px-2.5 bg-primary/10 hover:bg-primary/20 rounded-full transition-all"
               >
                 <Plus className="w-3.5 h-3.5" /> Group
               </Button>
@@ -644,11 +645,16 @@ export function ChatLayout() {
       </Motion.div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-background relative">
+      <div className="flex-1 flex flex-col min-w-0 relative bg-transparent p-2 md:p-3">
         {activeConversation ? (
           <>
             {/* Chat Header */}
-            <div className="h-16 border-b border-border bg-card/80 backdrop-blur-md flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-10">
+            <Motion.div
+              key={activeConversation?._id}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="h-16 border-b border-border/70 rounded-[24px] glass-panel flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-10"
+            >
               <div className="flex items-center gap-3">
                 <Button
                   variant="ghost"
@@ -692,32 +698,32 @@ export function ChatLayout() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-primary hidden sm:flex"
+                  className="hidden sm:flex rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
                 >
-                  <Phone className="w-5 h-5" />
+                  <Bell className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-primary hidden sm:flex"
+                  className="hidden sm:flex rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
                 >
-                  <Video className="w-5 h-5" />
+                  <Settings className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground"
+                  className="rounded-full text-muted-foreground hover:bg-secondary/70"
                 >
                   <MoreVertical className="w-5 h-5" />
                 </Button>
               </div>
-            </div>
+            </Motion.div>
 
             {/* Messages Area */}
             <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar bg-gradient-to-b from-transparent to-secondary/15"
+              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar rounded-[28px] mt-3 border border-border/70 bg-card/70 backdrop-blur-sm shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
             >
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
@@ -866,10 +872,10 @@ export function ChatLayout() {
                               )}
                             <div
                               className={cn(
-                                "px-4 py-2.5 rounded-2xl shadow-sm flex flex-col gap-2 relative group",
+                                "px-4 py-2.5 rounded-[22px] shadow-[0_10px_18px_rgba(15,23,42,0.08)] flex flex-col gap-2 relative group",
                                 isMe
-                                  ? "bg-primary text-primary-foreground rounded-br-sm shadow-sm"
-                                  : "bg-secondary text-secondary-foreground rounded-bl-sm border border-border",
+                                  ? "bg-primary text-primary-foreground rounded-br-sm"
+                                  : "bg-white/90 text-secondary-foreground rounded-bl-sm border border-border/70 dark:bg-slate-900/80",
                               )}
                             >
                               {/* Floating Reaction Menu */}
@@ -1183,7 +1189,7 @@ export function ChatLayout() {
                                 <span className="text-[10px] text-muted-foreground ml-1 mb-0.5">
                                   {user.fullName}
                                 </span>
-                                <div className="px-4 py-2.5 rounded-2xl bg-secondary text-secondary-foreground rounded-bl-sm border border-border flex items-center gap-1.5 h-9">
+                                <div className="px-4 py-2.5 rounded-[20px] bg-white/90 text-secondary-foreground rounded-bl-sm border border-border/70 dark:bg-slate-900/80 flex items-center gap-1.5 h-9">
                                   <Motion.div
                                     animate={{ y: [0, -3, 0] }}
                                     transition={{
@@ -1223,7 +1229,7 @@ export function ChatLayout() {
                           <div className="shrink-0 mt-auto">
                             <Avatar src={chatAvatar} size="sm" />
                           </div>
-                          <div className="px-4 py-3.5 rounded-2xl bg-secondary text-secondary-foreground rounded-bl-sm border border-border flex items-center gap-1.5 h-11">
+                          <div className="px-4 py-3.5 rounded-[20px] bg-white/90 text-secondary-foreground rounded-bl-sm border border-border/70 dark:bg-slate-900/80 flex items-center gap-1.5 h-11">
                             <Motion.div
                               animate={{ y: [0, -3, 0] }}
                               transition={{
@@ -1260,9 +1266,9 @@ export function ChatLayout() {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 bg-card border-t border-border shrink-0">
+            <div className="p-4 shrink-0">
               {replyingToMessage && (
-                <div className="mb-2 p-3 bg-secondary/40 border-l-4 border-primary rounded-lg flex items-center justify-between max-w-4xl mx-auto animate-fadeIn">
+                <div className="mb-2 p-3 bg-secondary/60 border-l-4 border-primary rounded-2xl flex items-center justify-between max-w-4xl mx-auto animate-fadeIn">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-primary mb-1">
                       Replying to{" "}
@@ -1312,7 +1318,7 @@ export function ChatLayout() {
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3 px-4 py-3 bg-secondary/40 border border-border rounded-xl max-w-xs mx-auto">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-secondary/60 border border-border/70 rounded-2xl max-w-xs mx-auto">
                       <div
                         className={cn(
                           "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
@@ -1351,7 +1357,7 @@ export function ChatLayout() {
               )}
               <form
                 onSubmit={handleSendMessage}
-                className="flex items-end gap-2 max-w-4xl mx-auto"
+                className="flex items-end gap-2 max-w-4xl mx-auto rounded-[28px] border border-border/70 bg-card/80 p-2 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
               >
                 <input
                   type="file"
@@ -1370,7 +1376,7 @@ export function ChatLayout() {
                   <Paperclip className="w-5 h-5" />
                 </Button>
 
-                <div className="flex-1 bg-input border border-border rounded-2xl flex items-end focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all shadow-inner shadow-black/5 relative">
+                <div className="flex-1 bg-input/90 border border-border/70 rounded-[22px] flex items-end focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all shadow-inner shadow-black/5 relative">
                   <Button
                     type="button"
                     variant="ghost"
@@ -1412,7 +1418,7 @@ export function ChatLayout() {
                   size="icon"
                   disabled={!messageText.trim() && !selectedFile}
                   className={cn(
-                    "mb-1 shrink-0 rounded-xl transition-all duration-200 h-11 w-11",
+                    "mb-1 shrink-0 rounded-2xl transition-all duration-200 h-11 w-11",
                     messageText.trim() || selectedFile
                       ? "bg-primary text-primary-foreground hover:opacity-90 shadow-md shadow-primary/20"
                       : "bg-secondary text-muted-foreground/60",
@@ -1424,8 +1430,8 @@ export function ChatLayout() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center bg-background">
-            <div className="w-24 h-24 bg-secondary rounded-full flex items-center justify-center mb-6 shadow-xl border border-border">
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center rounded-[32px] m-2 border border-border/70 bg-card/70 backdrop-blur-sm">
+            <div className="w-24 h-24 bg-gradient-to-br from-primary/15 to-primary/5 rounded-full flex items-center justify-center mb-6 shadow-lg border border-border/70">
               <svg
                 width="40"
                 height="40"
