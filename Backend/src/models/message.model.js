@@ -19,7 +19,9 @@ const messageSchema = new Schema(
     },
     ciphertext: {
       type: String,
-      required: true,
+      required: function () {
+        return this.type === "text";
+      },
     },
     image: {
       type: String,
@@ -84,7 +86,12 @@ const messageSchema = new Schema(
     iv: {
       type: String,
       default: "",
-      required: true,
+      // Only 1:1 messages store an `iv`. Group messages derive their IV
+      // deterministically from `counter` instead (see crypto.js), so they
+      // never send one — don't make this required for them.
+      required: function () {
+        return this.type === "text" && this.counter == null;
+      },
     },
     // ─── Group-only fields ────────────────────────────────────────────
     // counter: monotonically increasing per sender per group.
