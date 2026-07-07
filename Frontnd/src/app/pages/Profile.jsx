@@ -1,34 +1,44 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { motion as Motion } from "framer-motion";
-import { User, Mail, Lock, Camera, ArrowLeft, Save, LogOut, Loader2 } from "lucide-react";
+import { AnimatePresence, motion as Motion } from "framer-motion";
+import {
+  Camera,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Lock,
+  Mail,
+  User,
+  X,
+} from "lucide-react";
 import { Button, Input, Avatar } from "../components/ui/index";
+import {
+  GroupedList,
+  GroupedListRow,
+  GroupedListSeparator,
+} from "../components/ui/grouped-list";
 import { toast } from "sonner";
 import useAuthStore from "../store/authStore";
 import { getAvatarUrl } from "../lib/avatar";
 
 export function Profile() {
   const navigate = useNavigate();
-  const { authUser, logout, updateProfile, updateAvatar, isLoading } = useAuthStore();
+  const { authUser, logout, updateProfile, updateAvatar, isLoading } =
+    useAuthStore();
 
   const [fullName, setFullName] = useState(authUser?.fullName || "");
   const [username, setUsername] = useState(authUser?.username || "");
   const [email] = useState(authUser?.email || "");
-  // Local preview URL — shows the new image immediately before
-  // the upload finishes, making the UI feel instant.
   const [avatarPreview, setAvatarPreview] = useState(null);
-
-  // Hidden file input — we trigger it programmatically when the
-  // user clicks the avatar overlay. This gives us full control
-  // over the visual design without using a default file input.
+  const [editingField, setEditingField] = useState(null);
+  const [editingValue, setEditingValue] = useState("");
   const fileInputRef = useRef(null);
 
-  // Handler called when user picks a file
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Basic client-side validation before hitting the server
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
@@ -42,9 +52,24 @@ export function Profile() {
     await updateAvatar(file);
   };
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    await updateProfile({ fullName, username });
+  const openEditor = (field) => {
+    setEditingField(field);
+    setEditingValue(field === "fullName" ? fullName : username);
+  };
+
+  const saveEditor = async () => {
+    const nextValue = editingValue.trim();
+    if (!nextValue || !editingField) return;
+
+    const nextProfile = {
+      fullName: editingField === "fullName" ? nextValue : fullName,
+      username: editingField === "username" ? nextValue : username,
+    };
+
+    if (editingField === "fullName") setFullName(nextValue);
+    if (editingField === "username") setUsername(nextValue);
+    await updateProfile(nextProfile);
+    setEditingField(null);
   };
 
   const handleLogout = async () => {
@@ -54,138 +79,181 @@ export function Profile() {
 
   if (!authUser) return null;
 
-  // Display priority: local preview > Cloudinary URL > default avatar
   const displayAvatar = avatarPreview || getAvatarUrl(authUser);
 
   return (
-    <div className="min-h-screen w-full bg-background text-foreground flex justify-center p-4 py-8 sm:py-12">
-      <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-
-      <Motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-2xl bg-card rounded-3xl shadow-2xl shadow-primary/5 border border-border z-10 flex flex-col overflow-hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border bg-card/80 backdrop-blur-md">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-secondary/40 rounded-full" onClick={() => navigate("/")}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl font-semibold text-foreground">Account Settings</h1>
-          </div>
-          <Button variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
+    <main className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col px-4 pb-10 pt-4">
+        <header className="relative flex min-h-12 items-center justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-0 text-primary"
+            onClick={() => navigate("/")}
+          >
+            <ChevronLeft className="size-6" />
           </Button>
-        </div>
+          <h1 className="text-xl font-semibold leading-[25px]">
+            Account Settings
+          </h1>
+        </header>
 
-        <form onSubmit={handleSave} className="p-6 sm:p-8 flex-1 overflow-y-auto">
-
-          {/* Avatar Section */}
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-10">
-            <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
-              <Avatar src={displayAvatar} size="xl" />
-              <div className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity border-2 border-primary">
+        <Motion.section
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-1 flex-col"
+        >
+          <div className="flex flex-col items-center pb-8 pt-6 text-center">
+            <button
+              type="button"
+              className="relative rounded-full active:scale-[0.98]"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Avatar src={displayAvatar} size="2xl" />
+              <span className="absolute bottom-1 right-1 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground ring-4 ring-background">
                 {isLoading ? (
-                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  <>
-                    <Camera className="w-6 h-6 text-white mb-1" />
-                    <span className="text-[10px] font-medium text-white uppercase tracking-wider">Change</span>
-                  </>
+                  <Camera className="size-4" />
                 )}
-              </div>
-              {/* Hidden file input — triggered by clicking the avatar */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarChange}
-              />
-            </div>
+              </span>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
+            <h2 className="mt-4 text-[22px] font-bold leading-7">
+              {fullName || authUser.username}
+            </h2>
+            <p className="text-[15px] leading-5 text-label-secondary">
+              @{username}
+            </p>
+          </div>
 
-            <div className="text-center sm:text-left space-y-1 mt-2 sm:mt-0">
-              <h3 className="text-lg font-medium text-foreground">Profile Picture</h3>
-              <p className="text-sm text-muted-foreground max-w-xs">
-                Click your avatar to upload a new photo. JPG, PNG or WebP, max 5MB.
-              </p>
-              <div className="pt-2 flex justify-center sm:justify-start gap-2">
+          <section className="space-y-8">
+            <GroupedList>
+              <GroupedListRow interactive onClick={() => openEditor("fullName")}>
+                <div className="flex items-center gap-3">
+                  <User className="size-5 text-label-secondary stroke-[1.75]" />
+                  <span>Full Name</span>
+                </div>
+                <div className="flex min-w-0 items-center gap-2 text-label-secondary">
+                  <span className="truncate text-[15px] leading-5">
+                    {fullName}
+                  </span>
+                  <ChevronRight className="size-4 shrink-0" />
+                </div>
+              </GroupedListRow>
+              <GroupedListSeparator className="ml-12" />
+              <GroupedListRow interactive onClick={() => openEditor("username")}>
+                <div className="flex items-center gap-3">
+                  <User className="size-5 text-label-secondary stroke-[1.75]" />
+                  <span>Username</span>
+                </div>
+                <div className="flex min-w-0 items-center gap-2 text-label-secondary">
+                  <span className="truncate text-[15px] leading-5">
+                    @{username}
+                  </span>
+                  <ChevronRight className="size-4 shrink-0" />
+                </div>
+              </GroupedListRow>
+              <GroupedListSeparator className="ml-12" />
+              <GroupedListRow>
+                <div className="flex items-center gap-3">
+                  <Mail className="size-5 text-label-secondary stroke-[1.75]" />
+                  <span>Email</span>
+                </div>
+                <span className="min-w-0 truncate text-right text-[15px] leading-5 text-label-secondary">
+                  {email}
+                </span>
+              </GroupedListRow>
+            </GroupedList>
+
+            <GroupedList>
+              <GroupedListRow className="text-label-tertiary">
+                <div className="flex items-center gap-3">
+                  <Lock className="size-5 stroke-[1.75]" />
+                  <span>Change Password</span>
+                </div>
+              </GroupedListRow>
+            </GroupedList>
+
+            <GroupedList>
+              <GroupedListRow
+                interactive
+                onClick={handleLogout}
+                className="justify-center text-destructive"
+              >
+                Sign Out
+              </GroupedListRow>
+            </GroupedList>
+          </section>
+        </Motion.section>
+      </div>
+
+      <AnimatePresence>
+        {editingField && (
+          <Motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 sm:items-center"
+            onClick={() => setEditingField(null)}
+          >
+            <Motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              className="glass-thick mb-3 w-full max-w-[420px] overflow-hidden rounded-t-[28px] sm:mb-0 sm:rounded-[28px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-label-tertiary/40" />
+              <div className="hairline flex min-h-12 items-center justify-between px-2">
                 <Button
-                  type="button"
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
-                  onClick={() => fileInputRef.current?.click()}
+                  className="text-primary"
+                  onClick={() => setEditingField(null)}
+                >
+                  <X className="size-4" />
+                  Cancel
+                </Button>
+                <h2 className="text-[17px] font-semibold leading-[22px]">
+                  {editingField === "fullName" ? "Full Name" : "Username"}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="font-semibold text-primary"
+                  onClick={saveEditor}
                   disabled={isLoading}
                 >
                   {isLoading ? (
-                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Uploading...</>
+                    <Loader2 className="size-4 animate-spin" />
                   ) : (
-                    "Upload new"
+                    <Check className="size-4" />
                   )}
+                  Save
                 </Button>
               </div>
-            </div>
-          </div>
-
-          <div className="w-full h-px bg-border/60 mb-10" />
-
-          {/* Personal Information */}
-          <div className="space-y-6 max-w-lg">
-            <h3 className="text-lg font-medium text-foreground mb-4">Personal Information</h3>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground ml-1">Full Name</label>
-              <Input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                icon={User}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground ml-1">Username</label>
-              <Input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                icon={User}
-                required
-              />
-              <p className="text-xs text-muted-foreground/80 ml-1 mt-1">This is your public display name.</p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground ml-1">Email Address</label>
-              <Input type="email" value={email} icon={Mail} disabled />
-              <p className="text-xs text-muted-foreground/80 ml-1 mt-1">Email cannot be changed for security reasons.</p>
-            </div>
-
-            <div className="space-y-2 pt-4">
-              <h3 className="text-lg font-medium text-foreground mb-2">Security</h3>
-              <label className="text-sm font-medium text-muted-foreground ml-1">Password</label>
-              <div className="flex gap-3">
-                <Input type="password" value="••••••••" icon={Lock} disabled />
-                <Button type="button" variant="secondary" className="shrink-0" disabled>Change</Button>
+              <div className="p-5">
+                <Input
+                  autoFocus
+                  value={editingValue}
+                  onChange={(e) => setEditingValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveEditor();
+                    if (e.key === "Escape") setEditingField(null);
+                  }}
+                />
               </div>
-            </div>
-          </div>
-        </form>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-border bg-card flex justify-end gap-3 mt-auto">
-          <Button type="button" variant="ghost" onClick={() => navigate("/")} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button type="submit" onClick={handleSave} className="shadow-lg shadow-primary/20" disabled={isLoading}>
-            {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            {isLoading ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
-      </Motion.div>
-    </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
+    </main>
   );
 }

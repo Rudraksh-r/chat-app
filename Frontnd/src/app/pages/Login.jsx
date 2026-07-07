@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
-import { Mail, Lock, ArrowRight } from "lucide-react";
+import { ArrowRight, Lock, Mail, MessageCircle } from "lucide-react";
 import { Button, Input } from "../components/ui/index";
 import useAuthStore from "../store/authStore";
 
@@ -20,74 +20,87 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background text-foreground flex items-center justify-center p-4">
-      {/* Background decoration */}
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/20 rounded-full blur-[100px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-[100px]" />
-
-      <Motion.div
-        initial={{ opacity: 0, y: 20 }}
+    <main className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-8 text-foreground">
+      <Motion.section
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-card rounded-3xl p-8 shadow-2xl shadow-primary/5 border border-border z-10"
+        className="w-full max-w-[420px] rounded-[28px] bg-card px-5 py-6 shadow-[0_18px_50px_rgba(0,0,0,0.08)] sm:px-6"
       >
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/25">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="var(--primary-foreground)" />
-              <path d="M2 17L12 22L22 17" stroke="var(--primary-foreground)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 12L12 17L22 12" stroke="var(--primary-foreground)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-[18px] bg-primary text-primary-foreground">
+            <MessageCircle className="size-7 stroke-[1.75]" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Welcome back</h1>
-          <p className="text-muted-foreground">Sign in to continue your conversations</p>
+          <h1 className="text-[28px] font-bold leading-[34px] text-foreground">
+            Welcome back
+          </h1>
+          <p className="mt-2 text-[15px] leading-5 text-label-secondary">
+            Sign in to continue your conversations.
+          </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-muted-foreground ml-1">Email address</label>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <label className="block space-y-2">
+            <span className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
+              Email
+            </span>
             <Input
               type="email"
-              placeholder="name@company.com"
+              placeholder="name@example.com"
               icon={Mail}
               required
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
             />
-          </div>
+          </label>
 
-          <div className="space-y-1">
-            <div className="flex items-center justify-between ml-1">
-              <label className="text-sm font-medium text-muted-foreground">Password</label>
-              <a href="#" className="text-sm font-medium text-primary hover:opacity-80 transition-colors">Forgot password?</a>
-            </div>
+          <label className="block space-y-2">
+            <span className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
+              Password
+            </span>
             <Input
               type="password"
-              placeholder="••••••••"
+              placeholder="Password"
               icon={Lock}
               required
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
             />
+          </label>
+
+          <div className="flex min-h-11 items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-[15px] leading-5 text-label-secondary">
+              <input
+                type="checkbox"
+                id="remember"
+                className="size-5 rounded-md border-border bg-input text-primary focus:ring-primary/50"
+              />
+              Remember me
+            </label>
+            <a
+              href="#"
+              className="text-[15px] font-medium leading-5 text-primary transition-opacity hover:opacity-80"
+            >
+              Forgot?
+            </a>
           </div>
 
-          <div className="flex items-center space-x-2 ml-1">
-            <input type="checkbox" id="remember" className="rounded bg-input border-border text-primary focus:ring-primary/50 w-4 h-4" />
-            <label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer">Remember me for 30 days</label>
-          </div>
-
-          <Button type="submit" className="w-full h-12 text-base mt-4 group" isLoading={isLoading}>
+          <Button type="submit" className="mt-2 w-full" isLoading={isLoading}>
             Sign In
-            {!isLoading && <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />}
+            {!isLoading && <ArrowRight className="size-4" />}
           </Button>
         </form>
 
-        <p className="mt-8 text-center text-sm text-muted-foreground">
-          Don't have an account?{" "}
-          <Link to="/signup" className="text-primary hover:opacity-80 font-medium transition-colors">
+        <p className="mt-8 text-center text-[15px] leading-5 text-label-secondary">
+          New here?{" "}
+          <Link to="/signup" className="font-medium text-primary">
             Create an account
           </Link>
         </p>
-      </Motion.div>
-    </div>
+      </Motion.section>
+    </main>
   );
 }

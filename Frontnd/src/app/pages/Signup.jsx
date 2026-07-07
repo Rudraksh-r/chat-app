@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
-import { Mail, Lock, User, Image as ImageIcon } from "lucide-react";
+import { Camera, Lock, Mail, User } from "lucide-react";
 import { Button, Input } from "../components/ui/index";
 import useAuthStore from "../store/authStore";
 
@@ -22,92 +22,110 @@ export function Signup() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-background text-foreground flex items-center justify-center p-4 py-12">
-      {/* Background decoration */}
-      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px]" />
-      
-      <Motion.div
-        initial={{ opacity: 0, y: 20 }}
+    <main className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-8 text-foreground">
+      <Motion.section
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-card rounded-3xl p-8 shadow-2xl shadow-primary/5 border border-border z-10"
+        className="w-full max-w-[420px] rounded-[28px] bg-card px-5 py-6 shadow-[0_18px_50px_rgba(0,0,0,0.08)] sm:px-6"
       >
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Create an account</h1>
-          <p className="text-muted-foreground">Join the best communication platform</p>
+        <div className="mb-7 text-center">
+          <h1 className="text-[28px] font-bold leading-[34px] text-foreground">
+            Create Account
+          </h1>
+          <p className="mt-2 text-[15px] leading-5 text-label-secondary">
+            Start a private, encrypted chat space.
+          </p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-4">
-          <div className="flex justify-center mb-6">
-            <div className="relative group cursor-pointer">
-              <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center border-2 border-dashed border-border group-hover:border-primary transition-colors">
-                <ImageIcon className="w-6 h-6 text-muted-foreground group-hover:text-primary" />
-              </div>
-              <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                <span className="text-[10px] font-medium text-white uppercase tracking-wider">Upload</span>
-              </div>
-            </div>
+          <div className="flex justify-center pb-2">
+            <button
+              type="button"
+              className="relative flex size-24 items-center justify-center rounded-full bg-secondary text-label-secondary transition-colors active:scale-[0.98]"
+            >
+              <User className="size-10 stroke-[1.75]" />
+              <span className="absolute bottom-0 right-0 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground ring-4 ring-card">
+                <Camera className="size-4 stroke-[1.75]" />
+              </span>
+            </button>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-muted-foreground ml-1">Full Name</label>
+          <label className="block space-y-2">
+            <span className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
+              Full Name
+            </span>
             <Input
               type="text"
-              placeholder="John Doe"
+              placeholder="Alex Morgan"
               icon={User}
               required
               value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, fullName: e.target.value })
+              }
             />
-          </div>
+          </label>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-muted-foreground ml-1">Username</label>
+          <label className="block space-y-2">
+            <span className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
+              Username
+            </span>
             <Input
               type="text"
-              placeholder="johndoe"
+              placeholder="alex"
               icon={User}
               required
               value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, username: e.target.value })
+              }
             />
-          </div>
+          </label>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-muted-foreground ml-1">Email address</label>
+          <label className="block space-y-2">
+            <span className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
+              Email
+            </span>
             <Input
               type="email"
-              placeholder="name@company.com"
+              placeholder="name@example.com"
               icon={Mail}
               required
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
             />
-          </div>
+          </label>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-muted-foreground ml-1">Password</label>
+          <label className="block space-y-2">
+            <span className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
+              Password
+            </span>
             <Input
               type="password"
-              placeholder="Create a strong password"
+              placeholder="Create a password"
               icon={Lock}
               required
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
             />
-          </div>
+          </label>
 
-          <Button type="submit" className="w-full h-12 text-base mt-6" isLoading={isLoading}>
+          <Button type="submit" className="mt-2 w-full" isLoading={isLoading}>
             Create Account
           </Button>
         </form>
 
-        <p className="mt-8 text-center text-sm text-muted-foreground">
+        <p className="mt-8 text-center text-[15px] leading-5 text-label-secondary">
           Already have an account?{" "}
-          <Link to="/login" className="text-primary hover:opacity-80 font-medium transition-colors">
+          <Link to="/login" className="font-medium text-primary">
             Sign in
           </Link>
         </p>
-      </Motion.div>
-    </div>
+      </Motion.section>
+    </main>
   );
 }

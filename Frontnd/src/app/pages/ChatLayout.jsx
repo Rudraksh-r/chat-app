@@ -4,23 +4,21 @@ import { Link } from "react-router-dom";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import {
-  Search,
-  Plus,
+  ArrowUp,
+  ChevronLeft,
+  CirclePlus,
   Settings,
-  Bell,
+  SquarePen,
   MoreVertical,
   Phone,
   Video,
-  Paperclip,
   Smile,
-  Send,
   Check,
   CheckCheck,
-  Menu,
   X,
   LogOut,
   Loader2,
-  Ban,
+  Search,
   Trash2,
   Pencil,
   CornerUpLeft,
@@ -32,6 +30,7 @@ import {
 } from "lucide-react";
 import { formatTime, formatTimeAgo, cn } from "../lib/utils";
 import { Button, Avatar } from "../components/ui/index";
+import { SearchField } from "../components/ui/search-field";
 import useAuthStore from "../store/authStore";
 import useChatStore from "../store/chatStore";
 import useSocketStore from "../store/socketStore";
@@ -112,6 +111,7 @@ export function ChatLayout() {
   const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
 
   // Group creation modal state
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
@@ -330,6 +330,7 @@ export function ChatLayout() {
   // Handle scroll pagination
   const handleScroll = async (e) => {
     const container = e.currentTarget;
+    setIsHeaderScrolled(container.scrollTop > 4);
     if (container.scrollTop === 0 && hasMore && !isLoadingMore) {
       const previousScrollHeight = container.scrollHeight;
       await loadMoreMessages();
@@ -419,16 +420,16 @@ export function ChatLayout() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden font-sans text-foreground app-shell">
+    <div className="flex h-screen w-full overflow-hidden bg-background font-sans text-foreground app-shell">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
-        {!sidebarOpen && (
+        {sidebarOpen && activeConversation && (
           <Motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-950/25 z-40 md:hidden"
-            onClick={() => setSidebarOpen(true)}
+            className="fixed inset-0 z-40 bg-black/20 md:hidden"
+            onClick={() => setSidebarOpen(false)}
           />
         )}
       </AnimatePresence>
@@ -436,89 +437,82 @@ export function ChatLayout() {
       {/* Sidebar */}
       <Motion.div
         className={cn(
-          "fixed md:relative z-50 flex flex-col w-[320px] h-full shrink-0 transition-all duration-300 ease-out rounded-r-[32px] md:rounded-[28px] m-2 md:m-3 border border-border/70 glass-panel",
+          "fixed md:relative z-50 flex h-full w-full shrink-0 flex-col bg-sidebar transition-all duration-300 ease-out md:w-[360px] md:border-r md:border-sidebar-border",
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
         {/* Sidebar Header */}
-        <div className="p-4 flex items-center justify-between border-b border-border/70">
-          <div className="flex items-center gap-3">
-            <Avatar src={getAvatarUrl(authUser)} status="online" />
-            <div>
-              <h2 className="font-semibold text-foreground text-sm">
-                {authUser?.fullName}
-              </h2>
-              <p className="text-xs text-primary">@{authUser?.username}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
-              onClick={toggleTheme}
-            >
-              {theme === "dark" ? (
-                <Sun className="w-4 h-4" />
-              ) : (
-                <Moon className="w-4 h-4" />
-              )}
-            </Button>
-            <Link to="/profile">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
+        <div className="px-4 pb-3 pt-6">
+          <div className="mb-5 flex min-h-11 items-center justify-between">
+            <Link to="/profile" className="rounded-full">
+              <Avatar src={getAvatarUrl(authUser)} status="online" size="sm" />
             </Link>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-              onClick={logout}
+              className="text-primary"
+              onClick={() => setIsCreateGroupOpen(true)}
             >
-              <LogOut className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full text-muted-foreground md:hidden"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="w-4 h-4" />
+              <SquarePen className="size-5" />
             </Button>
           </div>
-        </div>
 
-        {/* Search & Actions */}
-        <div className="p-4 space-y-4 border-b border-border/70">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search users to start chatting..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-input/80 text-sm text-foreground rounded-2xl pl-9 pr-4 py-2.5 border border-border/80 shadow-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/60"
-            />
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <h1 className="text-[34px] font-bold leading-[41px] tracking-tight">
+              Messages
+            </h1>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-label-secondary hover:text-primary"
+                onClick={toggleTheme}
+              >
+                {theme === "dark" ? (
+                  <Sun className="size-5" />
+                ) : (
+                  <Moon className="size-5" />
+                )}
+              </Button>
+              <Link to="/profile">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-label-secondary hover:text-primary"
+                >
+                  <Settings className="size-5" />
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-label-secondary hover:text-destructive"
+                onClick={logout}
+              >
+                <LogOut className="size-5" />
+              </Button>
+            </div>
           </div>
-          <div className="flex justify-between items-center">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {searchQuery ? "Search Results" : "Messages"}
-            </h3>
-            {!searchQuery && (
+
+          <SearchField
+            placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+
+          {!searchQuery && (
+            <div className="mt-3 flex justify-end">
               <Button
                 onClick={() => setIsCreateGroupOpen(true)}
                 variant="ghost"
                 size="sm"
-                className="text-xs text-primary hover:opacity-80 flex items-center gap-1 h-8 px-2.5 bg-primary/10 hover:bg-primary/20 rounded-full transition-all"
+                className="min-h-9 rounded-full px-3 text-primary"
               >
-                <Plus className="w-3.5 h-3.5" /> Group
+                <SquarePen className="size-4" />
+                New Group
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Search Results or Chat List */}
@@ -534,17 +528,17 @@ export function ChatLayout() {
                 <div
                   key={user._id}
                   onClick={() => handleStartChat(user._id)}
-                  className="flex items-center gap-3 p-3 mx-2 my-1 rounded-xl cursor-pointer transition-all hover:bg-secondary/40"
+                  className="mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-all hover:bg-secondary/60"
                 >
                   <Avatar
                     src={getAvatarUrl(user)}
                     status={isUserOnline(user._id) ? "online" : "offline"}
                   />
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-foreground truncate">
+                    <h4 className="truncate text-[17px] font-semibold leading-[22px] text-foreground">
                       {user.fullName}
                     </h4>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="truncate text-[13px] leading-[18px] text-label-secondary">
                       @{user.username}
                     </p>
                   </div>
@@ -584,8 +578,8 @@ export function ChatLayout() {
                     setSidebarOpen(false);
                   }}
                   className={cn(
-                    "flex items-center gap-3 p-3 mx-2 my-1 rounded-xl cursor-pointer transition-all group",
-                    isActive ? "bg-secondary" : "hover:bg-secondary/40",
+                    "group mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-all",
+                    isActive ? "bg-secondary/60" : "hover:bg-secondary/45",
                   )}
                 >
                   <Avatar
@@ -595,25 +589,20 @@ export function ChatLayout() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <h4
-                        className={cn(
-                          "text-sm font-medium truncate",
-                          isActive
-                            ? "text-primary font-semibold"
-                            : "text-foreground",
-                        )}
+                        className="truncate text-[17px] font-semibold leading-[22px] text-foreground"
                       >
                         {name}
                       </h4>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                      <span className="ml-2 whitespace-nowrap text-xs leading-4 text-label-tertiary">
                         {formatTime(convo.updatedAt)}
                       </span>
                     </div>
                     <p
                       className={cn(
-                        "text-xs truncate",
+                        "truncate text-[13px] leading-[18px]",
                         unreadCounts[convo._id]
-                          ? "text-foreground font-semibold"
-                          : "text-muted-foreground",
+                          ? "font-semibold text-foreground"
+                          : "text-label-secondary",
                       )}
                     >
                       <span className="flex items-center gap-1">
@@ -624,7 +613,7 @@ export function ChatLayout() {
                     </p>
                   </div>
                   {unreadCounts[convo._id] > 0 && (
-                    <div className="shrink-0 flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm shadow-primary/30">
+                    <div className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-medium leading-[13px] text-primary-foreground">
                       {unreadCounts[convo._id]}
                     </div>
                   )}
@@ -645,7 +634,7 @@ export function ChatLayout() {
       </Motion.div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 relative bg-transparent p-2 md:p-3">
+      <div className="relative flex min-w-0 flex-1 flex-col bg-background">
         {activeConversation ? (
           <>
             {/* Chat Header */}
@@ -653,16 +642,19 @@ export function ChatLayout() {
               key={activeConversation?._id}
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="h-16 border-b border-border/70 rounded-[24px] glass-panel flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-10"
+              className={cn(
+                "glass sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between px-3 sm:px-5",
+                isHeaderScrolled && "hairline",
+              )}
             >
               <div className="flex items-center gap-3">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden mr-1 -ml-2 text-muted-foreground"
+                  className="mr-1 -ml-2 text-primary md:hidden"
                   onClick={() => setSidebarOpen(true)}
                 >
-                  <Menu className="w-5 h-5" />
+                  <ChevronLeft className="size-6" />
                 </Button>
                 <Avatar
                   src={chatAvatar}
@@ -675,17 +667,17 @@ export function ChatLayout() {
                   }
                 />
                 <div
-                  className="cursor-pointer group"
+                  className="group cursor-pointer"
                   onClick={() => {
                     if (activeConversation?.isGroupChat) {
                       setIsGroupInfoOpen(true);
                     }
                   }}
                 >
-                  <h2 className="font-semibold text-foreground text-sm sm:text-base group-hover:text-primary transition-colors">
+                  <h2 className="text-[17px] font-semibold leading-[22px] text-foreground transition-colors group-hover:text-primary">
                     {chatTitle}
                   </h2>
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <div className="flex items-center gap-1 text-[13px] leading-[18px] text-label-secondary">
                     {isOtherTyping ? (
                       <span className="text-primary">{getTypingText()}</span>
                     ) : (
@@ -698,23 +690,23 @@ export function ChatLayout() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="hidden sm:flex rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  className="hidden text-primary sm:flex"
                 >
-                  <Bell className="w-4 h-4" />
+                  <Phone className="size-5" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="hidden sm:flex rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  className="hidden text-primary sm:flex"
                 >
-                  <Settings className="w-4 h-4" />
+                  <Video className="size-5" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full text-muted-foreground hover:bg-secondary/70"
+                  className="text-primary hover:bg-secondary/70"
                 >
-                  <MoreVertical className="w-5 h-5" />
+                  <MoreVertical className="size-5" />
                 </Button>
               </div>
             </Motion.div>
@@ -723,7 +715,7 @@ export function ChatLayout() {
             <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar rounded-[28px] mt-3 border border-border/70 bg-card/70 backdrop-blur-sm shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+              className="custom-scrollbar flex-1 space-y-3 overflow-y-auto px-4 py-5 sm:px-6"
             >
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
@@ -745,6 +737,16 @@ export function ChatLayout() {
                         : null;
                     const showAvatar =
                       index === 0 || prevSenderIdStr !== senderIdStr;
+                    const nextSenderIdStr =
+                      index < messages.length - 1
+                        ? getMessageSenderId(messages[index + 1])
+                        : null;
+                    const isLastInGroup =
+                      index === messages.length - 1 ||
+                      nextSenderIdStr !== senderIdStr ||
+                      new Date(messages[index + 1]?.createdAt).getTime() -
+                        new Date(msg.createdAt).getTime() >
+                        60 * 1000;
                     const sender = activeConversation.members?.find(
                       (m) => m._id === senderIdStr,
                     );
@@ -772,7 +774,7 @@ export function ChatLayout() {
                               exit={{ opacity: 0, scale: 0.95, y: 10 }}
                               transition={{ duration: 0.1 }}
                               className={cn(
-                                "absolute z-50 bottom-full mb-1 min-w-[180px] bg-[#1E293B] border border-slate-700/60 shadow-xl rounded-xl py-1 overflow-hidden backdrop-blur-xl",
+                                "glass-thick absolute bottom-full z-50 mb-1 min-w-[190px] overflow-hidden rounded-2xl py-1",
                                 isMe ? "right-8" : "left-8",
                               )}
                               onClick={(e) => e.stopPropagation()}
@@ -782,9 +784,9 @@ export function ChatLayout() {
                                   deleteMessageForMe(msg._id);
                                   setContextMenuMsgId(null);
                                 }}
-                                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
+                                className="flex min-h-10 w-full items-center gap-2 px-4 text-left text-[15px] leading-5 text-foreground transition-colors hover:bg-secondary/60"
                               >
-                                <Trash2 className="w-4 h-4 text-slate-400" />
+                                <Trash2 className="size-4 text-label-secondary" />
                                 Delete for me
                               </button>
 
@@ -799,9 +801,9 @@ export function ChatLayout() {
                                       setEditMessageText(msg.text);
                                       setContextMenuMsgId(null);
                                     }}
-                                    className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
+                                    className="flex min-h-10 w-full items-center gap-2 px-4 text-left text-[15px] leading-5 text-foreground transition-colors hover:bg-secondary/60"
                                   >
-                                    <Pencil className="w-4 h-4 text-slate-400" />
+                                    <Pencil className="size-4 text-label-secondary" />
                                     Edit message
                                   </button>
                                 )}
@@ -811,9 +813,9 @@ export function ChatLayout() {
                                   setReplyingToMessage(msg);
                                   setContextMenuMsgId(null);
                                 }}
-                                className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors flex items-center gap-2"
+                                className="flex min-h-10 w-full items-center gap-2 px-4 text-left text-[15px] leading-5 text-foreground transition-colors hover:bg-secondary/60"
                               >
-                                <CornerUpLeft className="w-4 h-4 text-slate-400" />
+                                <CornerUpLeft className="size-4 text-label-secondary" />
                                 Reply
                               </button>
 
@@ -827,9 +829,9 @@ export function ChatLayout() {
                                       deleteMessageForEveryone(msg._id);
                                       setContextMenuMsgId(null);
                                     }}
-                                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                                    className="hairline mt-1 flex min-h-10 w-full items-center gap-2 px-4 text-left text-[15px] leading-5 text-destructive transition-colors hover:bg-destructive/10"
                                   >
-                                    <Ban className="w-4 h-4" />
+                                    <Trash2 className="size-4" />
                                     Delete for everyone
                                   </button>
                                 )}
@@ -872,16 +874,22 @@ export function ChatLayout() {
                               )}
                             <div
                               className={cn(
-                                "px-4 py-2.5 rounded-[22px] shadow-[0_10px_18px_rgba(15,23,42,0.08)] flex flex-col gap-2 relative group",
+                                "group relative flex flex-col gap-2 rounded-[18px] px-4 py-2.5",
                                 isMe
-                                  ? "bg-primary text-primary-foreground rounded-br-sm"
-                                  : "bg-white/90 text-secondary-foreground rounded-bl-sm border border-border/70 dark:bg-slate-900/80",
+                                  ? cn(
+                                      "bg-bubble-sent text-bubble-sent-foreground",
+                                      isLastInGroup && "rounded-br-md",
+                                    )
+                                  : cn(
+                                      "bg-bubble-received text-bubble-received-foreground",
+                                      isLastInGroup && "rounded-bl-md",
+                                    ),
                               )}
                             >
                               {/* Floating Reaction Menu */}
                               <div
                                 className={cn(
-                                  "group-hover:flex absolute -top-10 hidden bg-card border border-border p-1.5 rounded-full shadow-xl gap-1 z-20 transition-all",
+                                  "glass absolute -top-10 z-20 hidden gap-1 rounded-full p-1.5 transition-all group-hover:flex",
                                   isMe ? "right-0" : "left-0",
                                 )}
                               >
@@ -891,7 +899,7 @@ export function ChatLayout() {
                                     onClick={() =>
                                       sendToggleReaction(msg._id, emoji)
                                     }
-                                    className="hover:bg-secondary rounded-full w-7 h-7 flex items-center justify-center transition-transform hover:scale-110 text-lg cursor-pointer"
+                                    className="flex size-8 cursor-pointer items-center justify-center rounded-full text-lg transition-transform hover:scale-110 hover:bg-secondary"
                                   >
                                     {emoji}
                                   </button>
@@ -903,7 +911,7 @@ export function ChatLayout() {
                                     handleScrollToParent(msg.replyTo._id)
                                   }
                                   className={cn(
-                                    "mb-1 p-2 rounded bg-black/10 border-l-2 cursor-pointer transition-colors hover:bg-black/20",
+                                    "mb-1 cursor-pointer rounded-xl border-l-2 bg-black/10 p-2 transition-colors hover:bg-black/20",
                                     isMe
                                       ? "border-primary-foreground/40"
                                       : "border-muted-foreground/40",
@@ -1054,14 +1062,10 @@ export function ChatLayout() {
                                             msg._id,
                                             editMessageText,
                                           );
-                                          {
-                                            convo.lastMessage ||
-                                              "No messages yet";
-                                          }
                                         }
                                         setEditingMessageId(null);
                                       }}
-                                      className="text-white font-medium hover:text-indigo-200 transition-colors"
+                                      className="font-medium text-primary transition-opacity hover:opacity-80"
                                     >
                                       Save
                                     </button>
@@ -1069,7 +1073,7 @@ export function ChatLayout() {
                                 </div>
                               ) : (msg.type === "text" || msg.decryptedText != null) ? (
                                 <div className="flex flex-col">
-                                  <p className="text-[15px] leading-relaxed break-words">
+                                  <p className="break-words text-[17px] leading-[22px]">
                                     {msg.decryptedText ?? msg.text ?? "[Unable to decrypt]"}
                                   </p>
                                   {msg.isEdited && (
@@ -1110,10 +1114,10 @@ export function ChatLayout() {
                                         sendToggleReaction(msg._id, emoji)
                                       }
                                       className={cn(
-                                        "flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border shadow-sm transition-all hover:scale-105 cursor-pointer",
+                                        "flex cursor-pointer items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-[13px] transition-all hover:scale-105",
                                         hasReacted
-                                          ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-300"
-                                          : "bg-[#1E293B] border-slate-700/50 text-slate-300 hover:bg-slate-700/80",
+                                          ? "border-primary/40 bg-primary/15 text-primary"
+                                          : "border-border bg-card text-foreground hover:bg-secondary/70",
                                       )}
                                     >
                                       <span>{emoji}</span>
@@ -1129,15 +1133,15 @@ export function ChatLayout() {
                             )}
 
                             <div className="flex items-center gap-1 mt-1 px-1">
-                              <span className="text-[11px] text-slate-500">
+                              <span className="text-xs leading-4 text-label-tertiary">
                                 {formatTime(msg.createdAt)}
                               </span>
                               {isMe && (
                                 <span
                                   className={cn(
                                     msg.status === "seen"
-                                      ? "text-green-400"
-                                      : "text-indigo-400",
+                                      ? "text-success"
+                                      : "text-label-tertiary",
                                   )}
                                 >
                                   {msg.status === "seen" ? (
@@ -1189,7 +1193,7 @@ export function ChatLayout() {
                                 <span className="text-[10px] text-muted-foreground ml-1 mb-0.5">
                                   {user.fullName}
                                 </span>
-                                <div className="px-4 py-2.5 rounded-[20px] bg-white/90 text-secondary-foreground rounded-bl-sm border border-border/70 dark:bg-slate-900/80 flex items-center gap-1.5 h-9">
+                                <div className="flex h-9 items-center gap-1.5 rounded-[18px] rounded-bl-md bg-bubble-received px-4 py-2.5 text-bubble-received-foreground">
                                   <Motion.div
                                     animate={{ y: [0, -3, 0] }}
                                     transition={{
@@ -1197,7 +1201,7 @@ export function ChatLayout() {
                                       duration: 0.6,
                                       delay: 0,
                                     }}
-                                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                                  className="size-1.5 rounded-full bg-label-secondary"
                                   />
                                   <Motion.div
                                     animate={{ y: [0, -3, 0] }}
@@ -1206,7 +1210,7 @@ export function ChatLayout() {
                                       duration: 0.6,
                                       delay: 0.2,
                                     }}
-                                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                                    className="size-1.5 rounded-full bg-label-secondary"
                                   />
                                   <Motion.div
                                     animate={{ y: [0, -3, 0] }}
@@ -1215,7 +1219,7 @@ export function ChatLayout() {
                                       duration: 0.6,
                                       delay: 0.4,
                                     }}
-                                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                                    className="size-1.5 rounded-full bg-label-secondary"
                                   />
                                 </div>
                               </div>
@@ -1229,7 +1233,7 @@ export function ChatLayout() {
                           <div className="shrink-0 mt-auto">
                             <Avatar src={chatAvatar} size="sm" />
                           </div>
-                          <div className="px-4 py-3.5 rounded-[20px] bg-white/90 text-secondary-foreground rounded-bl-sm border border-border/70 dark:bg-slate-900/80 flex items-center gap-1.5 h-11">
+                          <div className="flex h-11 items-center gap-1.5 rounded-[18px] rounded-bl-md bg-bubble-received px-4 py-3.5 text-bubble-received-foreground">
                             <Motion.div
                               animate={{ y: [0, -3, 0] }}
                               transition={{
@@ -1237,7 +1241,7 @@ export function ChatLayout() {
                                 duration: 0.6,
                                 delay: 0,
                               }}
-                              className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                              className="size-1.5 rounded-full bg-label-secondary"
                             />
                             <Motion.div
                               animate={{ y: [0, -3, 0] }}
@@ -1246,7 +1250,7 @@ export function ChatLayout() {
                                 duration: 0.6,
                                 delay: 0.2,
                               }}
-                              className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                              className="size-1.5 rounded-full bg-label-secondary"
                             />
                             <Motion.div
                               animate={{ y: [0, -3, 0] }}
@@ -1255,7 +1259,7 @@ export function ChatLayout() {
                                 duration: 0.6,
                                 delay: 0.4,
                               }}
-                              className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                              className="size-1.5 rounded-full bg-label-secondary"
                             />
                           </div>
                         </div>
@@ -1266,9 +1270,9 @@ export function ChatLayout() {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 shrink-0">
+            <div className="shrink-0 px-3 py-3 sm:px-5">
               {replyingToMessage && (
-                <div className="mb-2 p-3 bg-secondary/60 border-l-4 border-primary rounded-2xl flex items-center justify-between max-w-4xl mx-auto animate-fadeIn">
+                <div className="animate-fadeIn mx-auto mb-2 flex max-w-4xl items-center justify-between rounded-2xl border-l-4 border-primary bg-secondary/60 p-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-primary mb-1">
                       Replying to{" "}
@@ -1301,7 +1305,7 @@ export function ChatLayout() {
                 </div>
               )}
               {mediaPreview && (
-                <div className="mb-3 mx-auto max-w-4xl animate-fadeIn">
+                <div className="animate-fadeIn mx-auto mb-3 max-w-4xl">
                   {mediaPreviewType === "image" ? (
                     <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border mx-auto">
                       <img
@@ -1312,13 +1316,13 @@ export function ChatLayout() {
                       <button
                         onClick={removefile}
                         type="button"
-                        className="absolute top-1 right-1 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                      className="absolute right-1 top-1 flex size-7 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3 px-4 py-3 bg-secondary/60 border border-border/70 rounded-2xl max-w-xs mx-auto">
+                    <div className="mx-auto flex max-w-xs items-center gap-3 rounded-2xl bg-card px-4 py-3">
                       <div
                         className={cn(
                           "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
@@ -1357,7 +1361,7 @@ export function ChatLayout() {
               )}
               <form
                 onSubmit={handleSendMessage}
-                className="flex items-end gap-2 max-w-4xl mx-auto rounded-[28px] border border-border/70 bg-card/80 p-2 shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+                className="glass mx-auto flex max-w-4xl items-end gap-1 rounded-[26px] p-1.5"
               >
                 <input
                   type="file"
@@ -1370,25 +1374,25 @@ export function ChatLayout() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="text-muted-foreground hover:text-foreground hover:bg-secondary/40 mb-1 shrink-0"
+                  className="mb-0.5 size-10 shrink-0 text-primary hover:bg-secondary/50"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Paperclip className="w-5 h-5" />
+                  <CirclePlus className="size-6" />
                 </Button>
 
-                <div className="flex-1 bg-input/90 border border-border/70 rounded-[22px] flex items-end focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all shadow-inner shadow-black/5 relative">
+                <div className="relative flex flex-1 items-end rounded-[22px] transition-all focus-within:ring-2 focus-within:ring-primary/20">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="text-muted-foreground hover:text-yellow-600 mb-1 ml-1 shrink-0"
+                    className="mb-0.5 ml-0.5 size-10 shrink-0 text-label-secondary hover:text-primary"
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   >
-                    <Smile className="w-5 h-5" />
+                    <Smile className="size-5" />
                   </Button>
 
                   {showEmojiPicker && (
-                    <div className="absolute bottom-14 left-0 z-50">
+                    <div className="glass-thick absolute bottom-14 left-0 z-50 overflow-hidden rounded-[24px]">
                       <EmojiPicker
                         theme={theme === "dark" ? "dark" : "light"}
                         onEmojiClick={(emojiData) => {
@@ -1402,7 +1406,7 @@ export function ChatLayout() {
                     value={messageText}
                     onChange={handleTyping}
                     placeholder="Type a message..."
-                    className="w-full bg-transparent text-foreground py-3 px-2 max-h-32 min-h-[44px] outline-none resize-none text-[15px] placeholder:text-muted-foreground/60 custom-scrollbar"
+                    className="custom-scrollbar min-h-11 max-h-32 w-full resize-none bg-transparent px-2 py-3 text-[17px] leading-[22px] text-foreground outline-none placeholder:text-muted-foreground"
                     rows={1}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
@@ -1413,32 +1417,33 @@ export function ChatLayout() {
                   />
                 </div>
 
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={!messageText.trim() && !selectedFile}
-                  className={cn(
-                    "mb-1 shrink-0 rounded-2xl transition-all duration-200 h-11 w-11",
-                    messageText.trim() || selectedFile
-                      ? "bg-primary text-primary-foreground hover:opacity-90 shadow-md shadow-primary/20"
-                      : "bg-secondary text-muted-foreground/60",
+                <AnimatePresence initial={false}>
+                  {(messageText.trim() || selectedFile) && (
+                    <Motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      className="mb-0.5 shrink-0"
+                    >
+                      <Button type="submit" size="icon" className="size-10">
+                        <ArrowUp className="size-5" />
+                      </Button>
+                    </Motion.div>
                   )}
-                >
-                  <Send className="w-5 h-5 ml-1" />
-                </Button>
+                </AnimatePresence>
               </form>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center rounded-[32px] m-2 border border-border/70 bg-card/70 backdrop-blur-sm">
-            <div className="w-24 h-24 bg-gradient-to-br from-primary/15 to-primary/5 rounded-full flex items-center justify-center mb-6 shadow-lg border border-border/70">
+          <div className="flex flex-1 flex-col items-center justify-center bg-background p-8 text-center text-label-secondary">
+            <div className="mb-6 flex size-24 items-center justify-center rounded-full bg-secondary">
               <svg
                 width="40"
                 height="40"
                 viewBox="0 0 24 24"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="text-slate-400"
+                className="text-label-secondary"
               >
                 <path
                   d="M21 11.5C21.0034 12.8199 20.6951 14.1219 20.1 15.3C19.3944 16.7118 18.3098 17.8992 16.9674 18.7293C15.6251 19.5594 14.0782 19.9994 12.5 20C11.1801 20.0035 9.87812 19.6951 8.7 19.1L3 21L4.9 15.3C4.30493 14.1219 3.99656 12.8199 4 11.5C4.00061 9.92179 4.44061 8.37488 5.27072 7.03258C6.10083 5.69028 7.28825 4.6056 8.7 3.90003C9.87812 3.30496 11.1801 2.99659 12.5 3C14.7533 3.00305 16.913 3.89966 18.5055 5.49216C20.098 7.08466 20.9946 9.24436 20.997 11.5H21Z"
@@ -1449,7 +1454,7 @@ export function ChatLayout() {
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-slate-200 mb-2 animate-fadeIn">
+            <h3 className="animate-fadeIn mb-2 text-xl font-semibold text-foreground">
               Welcome, {authUser?.fullName}!
             </h3>
             <p className="max-w-md">
@@ -1475,7 +1480,7 @@ export function ChatLayout() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setSelectedImageModal(null)}
-                className="absolute -top-12 right-0 text-slate-300 hover:text-white hover:bg-white/10 rounded-full bg-black/40"
+                className="absolute -top-12 right-0 rounded-full bg-black/40 text-white hover:bg-white/10"
               >
                 <X className="w-6 h-6" />
               </Button>
@@ -1485,7 +1490,7 @@ export function ChatLayout() {
                 exit={{ scale: 0.95 }}
                 src={selectedImageModal}
                 alt="Fullscreen Attachment"
-                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                className="max-h-[85vh] max-w-full rounded-lg object-contain"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
@@ -1500,7 +1505,7 @@ export function ChatLayout() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 sm:items-center"
             onClick={() => {
               setIsCreateGroupOpen(false);
               setGroupName("");
@@ -1509,26 +1514,27 @@ export function ChatLayout() {
             }}
           >
             <Motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
+              initial={{ y: 96, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 96, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-[#111827] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="glass-thick mb-3 flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] sm:mb-0 sm:rounded-[28px]"
             >
+              <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-label-tertiary/40" />
               {/* Header */}
-              <div className="p-4 border-b border-slate-800/60 flex items-center justify-between bg-slate-900/50">
+              <div className="hairline flex min-h-12 items-center justify-between px-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-100 font-sans">
+                  <h3 className="text-[17px] font-semibold leading-[22px] text-foreground">
                     Create Group Chat
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-label-secondary">
                     Collaborate with multiple people
                   </p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-slate-400 hover:text-white"
+                  className="text-primary"
                   onClick={() => {
                     setIsCreateGroupOpen(false);
                     setGroupName("");
@@ -1541,10 +1547,10 @@ export function ChatLayout() {
               </div>
 
               {/* Body */}
-              <div className="p-4 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
+              <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
                 {/* Group Name input */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <label className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
                     Group Name
                   </label>
                   <input
@@ -1552,17 +1558,17 @@ export function ChatLayout() {
                     placeholder="e.g. Project Avengers 🚀"
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value)}
-                    className="w-full bg-[#0F172A] text-sm text-slate-200 rounded-lg px-3 py-2.5 border border-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
+                    className="min-h-11 w-full rounded-2xl border-0 bg-input-background px-4 py-3 text-[17px] leading-[22px] text-foreground outline-none transition-all placeholder:text-muted-foreground focus:bg-input focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
 
                 {/* Selected Members Chips */}
                 {selectedGroupMembers.length > 0 && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <label className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
                       Selected Members ({selectedGroupMembers.length})
                     </label>
-                    <div className="flex flex-wrap gap-1.5 p-2 bg-[#0F172A]/50 rounded-lg border border-slate-800/40 max-h-24 overflow-y-auto custom-scrollbar">
+                    <div className="custom-scrollbar flex max-h-24 flex-wrap gap-1.5 overflow-y-auto rounded-2xl bg-card p-2">
                       {selectedGroupMembers.map((memberId) => {
                         const member =
                           groupSearchResults.find((m) => m._id === memberId) ||
@@ -1573,7 +1579,7 @@ export function ChatLayout() {
                         return (
                           <div
                             key={memberId}
-                            className="flex items-center gap-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs px-2.5 py-1 rounded-full animate-fadeIn"
+                            className="animate-fadeIn flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary"
                           >
                             <span>{member.fullName}</span>
                             <button
@@ -1585,7 +1591,7 @@ export function ChatLayout() {
                                   ),
                                 )
                               }
-                              className="text-indigo-400 hover:text-indigo-200 transition-colors"
+                              className="text-primary transition-opacity hover:opacity-70"
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -1598,26 +1604,26 @@ export function ChatLayout() {
 
                 {/* Member Search input */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <label className="ml-1 text-[13px] font-medium leading-[18px] text-label-secondary">
                     Add Members
                   </label>
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-label-secondary" />
                     <input
                       type="text"
                       placeholder="Search users..."
                       value={groupSearchQuery}
                       onChange={(e) => setGroupSearchQuery(e.target.value)}
-                      className="w-full bg-[#0F172A] text-sm text-slate-200 rounded-lg pl-9 pr-4 py-2 border border-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-slate-600"
+                      className="h-11 w-full rounded-full border-0 bg-secondary/70 pl-10 pr-4 text-[17px] leading-[22px] text-foreground outline-none transition-all placeholder:text-muted-foreground focus:bg-input focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
                 </div>
 
                 {/* Search Results list */}
-                <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                <div className="custom-scrollbar max-h-56 overflow-y-auto pr-1">
                   {isGroupSearching ? (
                     <div className="flex items-center justify-center py-6">
-                      <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                      <Loader2 className="size-5 animate-spin text-primary" />
                     </div>
                   ) : groupSearchResults.length > 0 ? (
                     groupSearchResults.map((user) => {
@@ -1642,10 +1648,10 @@ export function ChatLayout() {
                             }
                           }}
                           className={cn(
-                            "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all border border-transparent",
+                            "flex min-h-[58px] cursor-pointer items-center justify-between rounded-2xl px-3 transition-all",
                             isSelected
-                              ? "bg-[#4F46E5]/10 border-[#4F46E5]/20"
-                              : "hover:bg-slate-800/40",
+                              ? "bg-primary/10"
+                              : "hover:bg-secondary/60",
                           )}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -1657,10 +1663,10 @@ export function ChatLayout() {
                               }
                             />
                             <div className="min-w-0">
-                              <h4 className="text-xs font-medium text-slate-200 truncate">
+                              <h4 className="truncate text-[15px] font-medium leading-5 text-foreground">
                                 {user.fullName}
                               </h4>
-                              <p className="text-[10px] text-slate-500 truncate">
+                              <p className="truncate text-xs leading-4 text-label-secondary">
                                 @{user.username}
                               </p>
                             </div>
@@ -1668,21 +1674,21 @@ export function ChatLayout() {
 
                           <div
                             className={cn(
-                              "w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0",
+                              "flex size-5 shrink-0 items-center justify-center rounded-full border transition-all",
                               isSelected
-                                ? "bg-indigo-600 border-indigo-500 text-white"
-                                : "border-slate-700",
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border",
                             )}
                           >
                             {isSelected && (
-                              <Check className="w-3 h-3 stroke-[3]" />
+                              <Check className="size-3 stroke-[3]" />
                             )}
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <p className="text-center text-xs text-slate-600 py-6 font-sans">
+                    <p className="py-6 text-center text-xs text-label-tertiary">
                       No users found
                     </p>
                   )}
@@ -1690,10 +1696,10 @@ export function ChatLayout() {
               </div>
 
               {/* Footer */}
-              <div className="p-4 border-t border-slate-800/60 flex items-center justify-end gap-2 bg-slate-900/30">
+              <div className="hairline flex items-center justify-end gap-2 px-4 py-3">
                 <Button
                   variant="ghost"
-                  className="text-slate-400 hover:text-slate-200"
+                  className="text-primary"
                   onClick={() => {
                     setIsCreateGroupOpen(false);
                     setGroupName("");
@@ -1727,7 +1733,7 @@ export function ChatLayout() {
                       setGroupSearchQuery("");
                     }
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 px-4 py-2"
+                  className="px-4 py-2"
                   disabled={isCreatingGroup}
                 >
                   {isCreatingGroup ? (
@@ -1752,36 +1758,37 @@ export function ChatLayout() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 sm:items-center"
           >
             <Motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-[#1E293B] border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]"
+              initial={{ y: 96, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 96, opacity: 0 }}
+              className="glass-thick mb-3 flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-[28px] sm:mb-0 sm:rounded-[28px]"
             >
-              <div className="p-4 sm:p-5 border-b border-slate-700/60 flex items-center justify-between bg-slate-800/30">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <span className="text-indigo-400">👥</span> Group Info
+              <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-label-tertiary/40" />
+              <div className="hairline flex min-h-12 items-center justify-between px-3">
+                <h2 className="flex items-center gap-2 text-[17px] font-semibold leading-[22px] text-foreground">
+                  <span className="text-primary">👥</span> Group Info
                 </h2>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setIsGroupInfoOpen(false)}
-                  className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700/50"
+                  className="text-primary"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="size-5" />
                 </Button>
               </div>
 
-              <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
+              <div className="custom-scrollbar flex-1 overflow-y-auto p-5">
                 <div className="flex flex-col items-center gap-3 mb-6">
                   {/* Group Avatar — click to change (admin only) */}
                   <div className="relative group/avatar">
                     <Avatar
                       size="xl"
                       src={chatAvatar}
-                      className="w-20 h-20 ring-4 ring-slate-800"
+                      className="size-20 ring-4 ring-background"
                     />
                     {activeConversation.groupAdmins?.some(
                       (a) => (a._id || a) === authUser?._id,
@@ -1813,9 +1820,9 @@ export function ChatLayout() {
                         />
                         <button
                           onClick={() => groupAvatarInputRef.current?.click()}
-                          className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                          className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/45 opacity-0 transition-opacity group-hover/avatar:opacity-100"
                         >
-                          <Pencil className="w-4 h-4 text-white" />
+                          <Pencil className="size-4 text-white" />
                         </button>
                       </>
                     )}
@@ -1852,11 +1859,11 @@ export function ChatLayout() {
                         }
                         setIsEditingGroupName(false);
                       }}
-                      className="text-xl font-bold text-white bg-slate-800/60 border border-indigo-500 rounded-lg px-3 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full max-w-[260px]"
+                      className="w-full max-w-[260px] rounded-2xl border-0 bg-input-background px-3 py-2 text-center text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/50"
                     />
                   ) : (
                     <h3
-                      className={`text-xl font-bold text-white ${activeConversation.groupAdmins?.some((a) => (a._id || a) === authUser?._id) ? "cursor-pointer hover:text-indigo-400 transition-colors" : ""}`}
+                      className={`text-xl font-bold text-foreground ${activeConversation.groupAdmins?.some((a) => (a._id || a) === authUser?._id) ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
                       onClick={() => {
                         if (
                           activeConversation.groupAdmins?.some(
@@ -1879,18 +1886,18 @@ export function ChatLayout() {
                       {activeConversation.groupAdmins?.some(
                         (a) => (a._id || a) === authUser?._id,
                       ) && (
-                        <Pencil className="w-3 h-3 inline ml-2 text-slate-500" />
+                          <Pencil className="ml-2 inline size-3 text-label-secondary" />
                       )}
                     </h3>
                   )}
 
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-label-secondary">
                     {activeConversation.members?.length} Members
                   </p>
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  <h4 className="mb-2 text-[13px] font-medium leading-[18px] text-label-secondary">
                     Members
                   </h4>
                   {activeConversation.members?.map((member) => {
@@ -1905,7 +1912,7 @@ export function ChatLayout() {
                     return (
                       <div
                         key={member._id}
-                        className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 hover:bg-slate-800/60 transition-colors"
+                        className="flex min-h-[64px] items-center justify-between rounded-2xl bg-card px-3 py-2 transition-colors hover:bg-secondary/60"
                       >
                         <div className="flex items-center gap-3">
                           <Avatar
@@ -1916,21 +1923,21 @@ export function ChatLayout() {
                           />
                           <div>
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-slate-200">
+                              <p className="text-[15px] font-medium leading-5 text-foreground">
                                 {member.fullName}{" "}
                                 {isMe && (
-                                  <span className="text-xs text-indigo-400 font-normal">
+                                  <span className="text-xs font-normal text-primary">
                                     (You)
                                   </span>
                                 )}
                               </p>
                               {isAdmin && (
-                                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border border-indigo-500/30">
+                                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
                                   Admin
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-label-secondary">
                               @{member.username}
                             </p>
                           </div>
@@ -1943,7 +1950,7 @@ export function ChatLayout() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-7 text-xs text-indigo-400 hover:text-white hover:bg-indigo-500/20"
+                                className="min-h-9 text-xs text-primary"
                                 onClick={() =>
                                   promoteToAdmin(
                                     activeConversation._id,
@@ -1957,7 +1964,7 @@ export function ChatLayout() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 text-xs text-red-400 hover:text-white hover:bg-red-500/20"
+                              className="min-h-9 text-xs text-destructive hover:bg-destructive/10"
                               onClick={() =>
                                 removeGroupMember(
                                   activeConversation._id,
@@ -1986,11 +1993,11 @@ export function ChatLayout() {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: #334155;
+          background-color: var(--label-tertiary);
           border-radius: 10px;
         }
         .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-          background-color: #475569;
+          background-color: var(--label-secondary);
         }
 
         @keyframes fadeIn {
