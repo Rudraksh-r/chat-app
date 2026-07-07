@@ -149,7 +149,7 @@ const useChatStore = create((set, get) => ({
     if (!publicKeyB64) {
       throw new Error(
         "The other user hasn't set up encryption yet. " +
-          "Ask them to log out and log back in — that will generate their key.",
+        "Ask them to log out and log back in — that will generate their key.",
       );
     }
 
@@ -160,7 +160,7 @@ const useChatStore = create((set, get) => ({
     if (!myPrivateKey) {
       throw new Error(
         "Your private key is missing from this device. " +
-          "Please log out and log back in to regenerate it.",
+        "Please log out and log back in to regenerate it.",
       );
     }
 
@@ -226,18 +226,43 @@ const useChatStore = create((set, get) => ({
     }
   },
 
+  // chatStore.js
   decryptGroupMessageItem: async (message) => {
     const { authUser } = useAuthStore.getState();
     const senderId = (message.senderId?._id ?? message.senderId).toString();
     const convoId = message.convoId.toString();
 
+    // ── Self-sent messages: decrypt with our own sender key ─────────────
     if (senderId === authUser._id.toString()) {
-      return {
-        ...message,
-        decryptedText: "[Sent message — not cached locally]",
-      };
+      const ownKeyData = await getOwnSenderKey(convoId);
+
+      // Our key has rotated since this message was sent (member was
+      // removed) — the old key was deliberately deleted. Unrecoverable
+      // by design, not a bug.
+      if (
+        !ownKeyData ||
+        (message.keyVersion != null && ownKeyData.version !== message.keyVersion)
+      ) {
+        return { ...message, decryptedText: "[Message unavailable — key rotated]" };
+      }
+
+      try {
+        const plaintext = await decryptGroupMessage(
+          message.ciphertext,
+          message.counter,
+          ownKeyData.key,
+          -1, // no replay guard — we're re-reading our own sent history, not accepting new input
+        );
+        return { ...message, decryptedText: plaintext };
+      } catch (error) {
+        console.warn(
+          `E2EE: Self-decrypt failed for message ${message._id}: ${error.message}`,
+        );
+        return { ...message, decryptedText: "[Unable to decrypt]" };
+      }
     }
 
+    // ── Peer-sent messages: unchanged from your existing logic ──────────
     const peerKeyData = await getPeerSenderKey(convoId, senderId);
     if (!peerKeyData) {
       return null;
@@ -258,9 +283,7 @@ const useChatStore = create((set, get) => ({
         peerKeyData.key,
         peerKeyData.lastCounter,
       );
-
       await updatePeerCounter(convoId, senderId, message.counter);
-
       return { ...message, decryptedText: plaintext };
     } catch (error) {
       console.warn(
@@ -464,7 +487,7 @@ const useChatStore = create((set, get) => ({
 
     console.log(
       `✅ E2EE: Sender key v${senderData.version} distributed to ` +
-        `${validDistributions.length} members in group ${convoId}`,
+      `${validDistributions.length} members in group ${convoId}`,
     );
   },
 
@@ -507,7 +530,7 @@ const useChatStore = create((set, get) => ({
 
       console.log(
         `✅ E2EE: Stored sender key v${myEntry.keyVersion} ` +
-          `from ${senderId} for group ${convoId}`,
+        `from ${senderId} for group ${convoId}`,
       );
 
       // ── Retry queued messages ─────────────────────────────────────
@@ -611,32 +634,16 @@ const useChatStore = create((set, get) => ({
       let decrypted;
 
       if (isGroup) {
-        // Decrypt each group message using the sender's stored peer key
-        // Distribution messages are filtered out of the chat view
         const textMessages = raw.filter((m) => m.type === "text");
 
         decrypted = await Promise.all(
           textMessages.map(async (msg) => {
-            const senderId = (msg.senderId?._id ?? msg.senderId).toString();
-            const isOwnMessage = senderId === authUser._id.toString();
-
-            if (isOwnMessage) {
-              // We can't decrypt our own group messages with a peer key —
-              // we need our own sender key. But since we sent them,
-              // we already rendered them with decryptedText at send time.
-              // On reload, they're genuinely unreadable without
-              // a "copy for self" mechanism (out of scope for v1).
-              // Mark them clearly so the UX is honest.
-              return {
-                ...msg,
-                decryptedText: "[Sent message — not cached locally]",
-              };
-            }
-
             const result = await get().decryptGroupMessageItem(msg);
 
             if (result === null) {
-              // Key not available — queue and show placeholder
+              // Peer key not available yet — queue for retry when the
+              // distribution message arrives
+              const senderId = (msg.senderId?._id ?? msg.senderId).toString();
               const queueKey = `${msg.convoId}:${senderId}`;
               const existing = pendingMessageQueue.get(queueKey) ?? [];
               pendingMessageQueue.set(queueKey, [...existing, msg]);
@@ -647,164 +654,164 @@ const useChatStore = create((set, get) => ({
           }),
         );
       } else {
-        // 1:1 — decrypt all messages using the pairwise shared key
-        const otherUser = conversation.members?.find(
-          (m) => (m._id ?? m).toString() !== authUser._id.toString(),
-        );
+  // 1:1 — decrypt all messages using the pairwise shared key
+  const otherUser = conversation.members?.find(
+    (m) => (m._id ?? m).toString() !== authUser._id.toString(),
+  );
 
-        if (!otherUser) {
-          decrypted = raw;
-        } else {
-          const otherId = (otherUser._id ?? otherUser).toString();
-          decrypted = await Promise.all(
-            raw.map((msg) => get().decryptOneToOneMessage(msg, otherId)),
+  if (!otherUser) {
+    decrypted = raw;
+  } else {
+    const otherId = (otherUser._id ?? otherUser).toString();
+    decrypted = await Promise.all(
+      raw.map((msg) => get().decryptOneToOneMessage(msg, otherId)),
+    );
+  }
+}
+
+set({ messages: decrypted ?? [] });
+    } catch (err) {
+  console.error("Failed to load messages:", err);
+  toast.error("Failed to load messages");
+} finally {
+  set({ isLoadingMessages: false });
+}
+  },
+
+// ── Send a message (encrypts before sending) ──────────────────────────────
+sendMessage: async (text, file = null) => {
+  const { activeConversation, messages } = get();
+  const { authUser } = useAuthStore.getState();
+  if (!activeConversation || (!text?.trim() && !file)) return;
+
+  const plaintext = text?.trim() || "";
+
+  set({ isSending: true });
+
+  try {
+    const isGroup = activeConversation.isGroupChat;
+    let payload;
+    let useFormData = false;
+
+    if (isGroup) {
+      // ── Group send (inside mutex to prevent counter race) ──────────
+      payload = await withSenderKeyLock(
+        activeConversation._id.toString(),
+        async () => {
+          // Ensure we have a sender key (generate + distribute if first time)
+          const senderData = await get().ensureOwnSenderKey(
+            activeConversation._id.toString(),
+            activeConversation,
           );
-        }
-      }
 
-      set({ messages: decrypted ?? [] });
-    } catch (err) {
-      console.error("Failed to load messages:", err);
-      toast.error("Failed to load messages");
-    } finally {
-      set({ isLoadingMessages: false });
+          // Increment counter BEFORE encrypting
+          const nextCounter = senderData.counter + 1;
+
+          // Encrypt with our sender key
+          const { ciphertext } = await encryptGroupMessage(
+            plaintext,
+            senderData.key,
+            nextCounter,
+          );
+
+          // Persist the new counter
+          await storeOwnSenderKey(activeConversation._id.toString(), {
+            ...senderData,
+            counter: nextCounter,
+          });
+
+          return {
+            type: "text",
+            ciphertext,
+            counter: nextCounter,
+            keyVersion: senderData.version,
+          };
+        },
+      );
+    } else {
+      // ── 1:1 send ──────────────────────────────────────────────────
+      const otherUser = activeConversation.members?.find(
+        (m) => (m._id ?? m).toString() !== authUser._id.toString(),
+      );
+
+      if (!otherUser) throw new Error("Cannot identify recipient");
+
+      const otherId = (otherUser._id ?? otherUser).toString();
+      const sharedKey = await get().getSharedKey(
+        otherId,
+        otherUser.publicKey ?? null,
+      );
+
+      const { ciphertext, iv } = await encryptMessage(plaintext, sharedKey);
+
+      payload = { type: "text", ciphertext, iv };
     }
-  },
 
-  // ── Send a message (encrypts before sending) ──────────────────────────────
-  sendMessage: async (text, file = null) => {
-    const { activeConversation, messages } = get();
-    const { authUser } = useAuthStore.getState();
-    if (!activeConversation || (!text?.trim() && !file)) return;
+    let res;
 
-    const plaintext = text?.trim() || "";
+    if (file) {
+      const formData = new FormData();
+      formData.append("convoId", activeConversation._id.toString());
+      formData.append("type", payload.type);
+      formData.append("ciphertext", payload.ciphertext);
 
-    set({ isSending: true });
-
-    try {
-      const isGroup = activeConversation.isGroupChat;
-      let payload;
-      let useFormData = false;
-
-      if (isGroup) {
-        // ── Group send (inside mutex to prevent counter race) ──────────
-        payload = await withSenderKeyLock(
-          activeConversation._id.toString(),
-          async () => {
-            // Ensure we have a sender key (generate + distribute if first time)
-            const senderData = await get().ensureOwnSenderKey(
-              activeConversation._id.toString(),
-              activeConversation,
-            );
-
-            // Increment counter BEFORE encrypting
-            const nextCounter = senderData.counter + 1;
-
-            // Encrypt with our sender key
-            const { ciphertext } = await encryptGroupMessage(
-              plaintext,
-              senderData.key,
-              nextCounter,
-            );
-
-            // Persist the new counter
-            await storeOwnSenderKey(activeConversation._id.toString(), {
-              ...senderData,
-              counter: nextCounter,
-            });
-
-            return {
-              type: "text",
-              ciphertext,
-              counter: nextCounter,
-              keyVersion: senderData.version,
-            };
-          },
-        );
-      } else {
-        // ── 1:1 send ──────────────────────────────────────────────────
-        const otherUser = activeConversation.members?.find(
-          (m) => (m._id ?? m).toString() !== authUser._id.toString(),
-        );
-
-        if (!otherUser) throw new Error("Cannot identify recipient");
-
-        const otherId = (otherUser._id ?? otherUser).toString();
-        const sharedKey = await get().getSharedKey(
-          otherId,
-          otherUser.publicKey ?? null,
-        );
-
-        const { ciphertext, iv } = await encryptMessage(plaintext, sharedKey);
-
-        payload = { type: "text", ciphertext, iv };
+      if (payload.iv) {
+        formData.append("iv", payload.iv);
       }
 
-      let res;
-
-      if (file) {
-        const formData = new FormData();
-        formData.append("convoId", activeConversation._id.toString());
-        formData.append("type", payload.type);
-        formData.append("ciphertext", payload.ciphertext);
-
-        if (payload.iv) {
-          formData.append("iv", payload.iv);
-        }
-
-        if (payload.counter !== undefined && payload.counter !== null) {
-          formData.append("counter", payload.counter.toString());
-        }
-
-        if (payload.keyVersion !== undefined && payload.keyVersion !== null) {
-          formData.append("keyVersion", payload.keyVersion.toString());
-        }
-
-        formData.append("file", file);
-        useFormData = true;
-
-        res = await axiosInstance.post("/message/send", formData);
-      } else {
-        res = await axiosInstance.post("/message/send", {
-          convoId: activeConversation._id,
-          ...payload,
-        });
+      if (payload.counter !== undefined && payload.counter !== null) {
+        formData.append("counter", payload.counter.toString());
       }
 
-      // Append with plaintext immediately — we already have it, no need to decrypt
-      const sentMessage = { ...res.data.data, decryptedText: text };
-      set({ messages: [...messages, sentMessage] });
+      if (payload.keyVersion !== undefined && payload.keyVersion !== null) {
+        formData.append("keyVersion", payload.keyVersion.toString());
+      }
 
-      const lastMessageLabel = text || (file ? "📎 Attachment" : "New message");
+      formData.append("file", file);
+      useFormData = true;
 
-      // Update sidebar
-      set({
-        conversations: get().conversations.map((c) =>
-          c._id === activeConversation._id
-            ? {
-                ...c,
-                lastMessage: lastMessageLabel,
-                updatedAt: new Date().toISOString(),
-              }
-            : c,
-        ),
+      res = await axiosInstance.post("/message/send", formData);
+    } else {
+      res = await axiosInstance.post("/message/send", {
+        convoId: activeConversation._id,
+        ...payload,
       });
-    } catch (err) {
-      console.error("Send failed:", err);
-      if (err.message?.includes("hasn't set up encryption")) {
-        toast.error(err.message, { duration: 8000 });
-      } else if (err.message?.includes("missing from this device")) {
-        toast.error(
-          "Your encryption key is missing. Please log out and log back in.",
-          { duration: 8000 },
-        );
-      } else {
-        toast.error("Failed to send message");
-      }
-    } finally {
-      set({ isSending: false });
     }
-  },
+
+    // Append with plaintext immediately — we already have it, no need to decrypt
+    const sentMessage = { ...res.data.data, decryptedText: text };
+    set({ messages: [...messages, sentMessage] });
+
+    const lastMessageLabel = text || (file ? "📎 Attachment" : "New message");
+
+    // Update sidebar
+    set({
+      conversations: get().conversations.map((c) =>
+        c._id === activeConversation._id
+          ? {
+            ...c,
+            lastMessage: lastMessageLabel,
+            updatedAt: new Date().toISOString(),
+          }
+          : c,
+      ),
+    });
+  } catch (err) {
+    console.error("Send failed:", err);
+    if (err.message?.includes("hasn't set up encryption")) {
+      toast.error(err.message, { duration: 8000 });
+    } else if (err.message?.includes("missing from this device")) {
+      toast.error(
+        "Your encryption key is missing. Please log out and log back in.",
+        { duration: 8000 },
+      );
+    } else {
+      toast.error("Failed to send message");
+    }
+  } finally {
+    set({ isSending: false });
+  }
+},
 
   // Handle incoming real-time message (called from socketStore)
   addIncomingMessage: async (message) => {
@@ -934,644 +941,644 @@ const useChatStore = create((set, get) => ({
       conversations: currentConversations.map((c) =>
         c._id === message.convoId
           ? {
-              ...c,
-              lastMessage: sidebarMessageText,
-              updatedAt: new Date().toISOString(),
-            }
-          : c,
-      ),
-    });
-  },
-
-  // Phase 2.5 #3: Mark messages as seen in the UI (called from socketStore)
-  markMessagesSeen: (convoId, seenBy) => {
-    const { activeConversation, messages } = get();
-
-    // If we're viewing this conversation, update all messages from the other user
-    if (activeConversation && activeConversation._id === convoId) {
-      set({
-        messages: messages.map((msg) =>
-          msg.senderId !== seenBy ? { ...msg, status: "seen" } : msg,
-        ),
-      });
-    }
-  },
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // GROUP MANAGEMENT SOCKET HANDLERS
-  // ─────────────────────────────────────────────────────────────────────────
-
-  handleGroupKeyRotationRequired: async ({ convoId, newKeyEpoch }) => {
-    console.log(
-      `🔔 E2EE: Key rotation required for group ${convoId}, new epoch: ${newKeyEpoch}`,
-    );
-    await get().rotateSenderKey(convoId, newKeyEpoch);
-  },
-
-  handleIncomingGroupMemberRemoved: ({ convoId, targetUserId }) => {
-    const { authUser } = useAuthStore.getState();
-    const { activeConversation, conversations } = get();
-
-    // If we were removed, clear the active conversation
-    if (authUser._id.toString() === targetUserId.toString()) {
-      set({
-        conversations: conversations.filter(
-          (c) => c._id?.toString() !== convoId,
-        ),
-      });
-      if (activeConversation?._id?.toString() === convoId) {
-        set({ activeConversation: null, messages: [] });
-        toast.info("You were removed from this group");
-      }
-      return;
-    }
-
-    // Update member lists for remaining members
-    set({
-      activeConversation:
-        activeConversation?._id?.toString() === convoId
-          ? {
-              ...activeConversation,
-              members: activeConversation.members.filter(
-                (m) => (m._id ?? m).toString() !== targetUserId.toString(),
-              ),
-            }
-          : activeConversation,
-      conversations: conversations.map((c) =>
-        c._id?.toString() === convoId
-          ? {
-              ...c,
-              members: c.members.filter(
-                (m) => (m._id ?? m).toString() !== targetUserId.toString(),
-              ),
-            }
-          : c,
-      ),
-    });
-  },
-
-  // Create or get a conversation with a user (used when starting a new chat)
-  createConversation: async (receiverId) => {
-    try {
-      const res = await axiosInstance.post("/conversation", { receiverId });
-      const conversation = res.data.data;
-
-      // Add to conversations list if not already there
-      const { conversations } = get();
-      const exists = conversations.find((c) => c._id === conversation._id);
-      if (!exists) {
-        set({ conversations: [conversation, ...conversations] });
-      }
-
-      // Set it as active
-      await get().setActiveConversation(conversation);
-      return conversation;
-    } catch (error) {
-      console.error("Failed to create conversation:", error);
-      toast.error("Failed to start conversation");
-      return null;
-    }
-  },
-
-  // Create a new group conversation
-  createGroupConversation: async (groupName, memberIds) => {
-    try {
-      const res = await axiosInstance.post("/conversation/group", {
-        name: groupName,
-        memberIds: memberIds,
-      });
-      const conversation = res.data.data;
-
-      const { conversations } = get();
-      set({ conversations: [conversation, ...conversations] });
-
-      await get().setActiveConversation(conversation);
-      return conversation;
-    } catch (error) {
-      console.error("Failed to create group conversation:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to create group chat",
-      );
-      return null;
-    }
-  },
-
-  // Load more historical messages for pagination
-  loadMoreMessages: async () => {
-    const { activeConversation, messages, page, hasMore, isLoadingMore } =
-      get();
-    if (!activeConversation || !hasMore || isLoadingMore) return;
-
-    set({ isLoadingMore: true });
-    try {
-      const nextPage = page + 1;
-      const res = await axiosInstance.get(
-        `/message/${activeConversation._id}?limit=20&page=${nextPage}`,
-      );
-      const { messages: newMessages, hasMore: nextHasMore } = res.data.data;
-
-      set({
-        messages: [...newMessages, ...messages],
-        page: nextPage,
-        hasMore: nextHasMore,
-      });
-    } catch (error) {
-      console.error("Failed to load more messages:", error);
-      toast.error("Failed to load older messages");
-    } finally {
-      set({ isLoadingMore: false });
-    }
-  },
-
-  //soft-delete message (delete for everyone)
-  deleteMessage: async (messageId) => {
-    set({ isDeleting: true });
-    try {
-      await axiosInstance.patch(`/message/${messageId}/delete`);
-      toast.success("Message deleted for you");
-    } catch (error) {
-      console.error("Failed to delete message:", error);
-      toast.error("Failed to delete message");
-    } finally {
-      set({ isDeleting: false });
-    }
-  },
-  // Alias for clarity
-  deleteMessageForEveryone: async (messageId) => {
-    try {
-      await deleteMessageForEveryoneAPI(messageId);
-      toast.success("Message deleted for everyone");
-    } catch (error) {
-      console.error("Failed to delete for everyone:", error);
-      toast.error("Failed to delete for everyone");
-    }
-  },
-
-  deleteMessageForMe: async (messageId) => {
-    set({ isDeleting: true });
-    try {
-      await deleteMessageForMeAPI(messageId);
-      toast.success("Message deleted for you");
-      // The socket event will trigger markMessagesAsDeleted locally
-    } catch (error) {
-      console.error("Failed to delete message for you:", error);
-      toast.error("Failed to delete message");
-    } finally {
-      set({ isDeleting: false });
-    }
-  },
-
-  markMessagesAsDeleted: (messageId, convoId, permanently) => {
-    const { conversations, activeConversation, messages } = get();
-
-    let newMessages = messages;
-    if (activeConversation && activeConversation._id === convoId) {
-      if (permanently) {
-        newMessages = messages.map((msg) =>
-          msg._id === messageId
-            ? {
-                ...msg,
-                deletedForEveryone: true,
-                text: "Message deleted",
-                image: null,
-                document: null,
-                audio: null,
-              }
-            : msg,
-        );
-      } else {
-        newMessages = messages.filter((msg) => msg._id !== messageId);
-      }
-      set({ messages: newMessages });
-    }
-
-    set({
-      conversations: conversations.map((c) => {
-        if (c._id === convoId) {
-          let sidebarMessageText = c.lastMessage;
-
-          if (activeConversation && activeConversation._id === convoId) {
-            if (newMessages.length > 0) {
-              const lastMsg = newMessages[newMessages.length - 1];
-              sidebarMessageText = lastMsg.deletedForEveryone
-                ? "Message deleted"
-                : lastMsg.text ||
-                  (lastMsg.image
-                    ? "📷 Image"
-                    : lastMsg.audio?.url
-                      ? "🎵 Audio"
-                      : lastMsg.document?.url
-                        ? "📎 Document"
-                        : "");
-            } else {
-              sidebarMessageText = "No messages yet";
-            }
-          } else if (permanently) {
-            sidebarMessageText = "Message deleted";
-          }
-
-          return {
             ...c,
             lastMessage: sidebarMessageText,
             updatedAt: new Date().toISOString(),
-          };
-        }
-        return c;
-      }),
+          }
+          : c,
+      ),
     });
   },
-  //Edit message
-  editMessage: async (messageId, newText) => {
-    try {
-      const res = await axiosInstance.patch(`/message/${messageId}/edit`, {
-        text: newText,
-      });
-      const updatedMessage = res.data.data;
 
-      // Local State Mutation (Pessimistic UI Sync on sender side)
-      const updatedMessages = get().messages.map((msg) =>
-        msg._id === messageId ? updatedMessage : msg,
-      );
-      set({ messages: updatedMessages });
+    // Phase 2.5 #3: Mark messages as seen in the UI (called from socketStore)
+    markMessagesSeen: (convoId, seenBy) => {
+      const { activeConversation, messages } = get();
 
-      const lastMessage = updatedMessages[updatedMessages.length - 1];
-      if (lastMessage?._id === messageId) {
-        // Synchronize Sidebar list view item reference instantly
-        const updatedConversations = get().conversations.map((c) =>
-          c._id === updatedMessage.convoId
-            ? {
-                ...c,
-                lastMessage: newText,
-                updatedAt: new Date().toISOString(),
-              }
-            : c,
-        );
-        set({ conversations: updatedConversations });
-      }
-      return true;
-    } catch (error) {
-      console.error("Failed executing edit payload", error);
-      toast.error(
-        error.response?.data?.message || "Failed to save message edits",
-      );
-      return false;
-    }
-  },
-  // Real-time Event Receiver Handler invoked via socket connection mapping
-  updateIncomingEditMessage: (editedMessage) => {
-    const { activeConversation, messages, conversations } = get();
-    const messageId = getEntityId(editedMessage) || editedMessage.messageId;
-
-    // If the message belongs to the currently active conversation (the one open in chat window)
-    if (
-      activeConversation &&
-      activeConversation._id === editedMessage.convoId
-    ) {
-      // Update the message in the messages array
-      set({
-        messages: messages.map((msg) =>
-          msg._id === messageId ? editedMessage : msg,
-        ),
-      });
-    }
-
-    const lastMessage = messages[messages.length - 1];
-    if (
-      activeConversation?._id === editedMessage.convoId &&
-      lastMessage?._id === messageId
-    ) {
-      set({
-        conversations: conversations.map((c) =>
-          c._id === editedMessage.convoId
-            ? {
-                ...c,
-                lastMessage: editedMessage.text,
-                updatedAt: editedMessage.updatedAt,
-              }
-            : c,
-        ),
-      });
-    }
-  },
-
-  sendToggleReaction: async (messageId, emoji) => {
-    try {
-      // Execute the request via the HTTP pipeline
-      const res = await axiosInstance.post(`/message/${messageId}/react`, {
-        emoji,
-      });
-      const serverReactions = res.data.data;
-
-      // Optimistic/Pessimistic reconciliation on sender node instantly
-      const structuralRebuild = get().messages.map((m) =>
-        m._id === messageId ? { ...m, reactions: serverReactions } : m,
-      );
-      set({ messages: structuralRebuild });
-    } catch (error) {
-      console.error("Failed to apply emoji selection matrix sequence: ", error);
-    }
-  },
-
-  // Real-time socket receiver event listener callback hook
-  updateIncomingReaction: ({ messageId, reactions }) => {
-    const messages = get().messages;
-    const messageIndex = messages.findIndex((msg) => msg._id === messageId);
-    if (messageIndex > -1) {
-      const updatedMessages = [...messages];
-      updatedMessages[messageIndex] = {
-        ...updatedMessages[messageIndex],
-        reactions,
-      };
-      set({ messages: updatedMessages });
-    }
-  },
-
-  // Search users
-  searchUsers: async (keyword) => {
-    if (!keyword.trim()) return [];
-    try {
-      const res = await axiosInstance.get(`/user/search?search=${keyword}`);
-      return res.data.data;
-    } catch (error) {
-      console.error("Failed to search users:", error);
-      return [];
-    }
-  },
-
-  // Group actions
-  removeGroupMember: async (convoId, targetUserId) => {
-    const { activeConversation, conversations } = get();
-    // Save previous state for rollback
-    const prevActiveConversation = activeConversation;
-    const prevConversations = [...conversations];
-
-    // Optimistic UI update
-    if (activeConversation && activeConversation._id === convoId) {
-      const updatedMembers = activeConversation.members.filter(
-        (m) => m._id !== targetUserId,
-      );
-      const updatedAdmins = activeConversation.groupAdmins.filter(
-        (adminId) => getEntityId(adminId) !== targetUserId,
-      );
-      set({
-        activeConversation: {
-          ...activeConversation,
-          members: updatedMembers,
-          groupAdmins: updatedAdmins,
-        },
-      });
-    }
-
-    set({
-      conversations: conversations.map((c) => {
-        if (c._id === convoId) {
-          return {
-            ...c,
-            members: c.members.filter((m) => m._id !== targetUserId),
-            groupAdmins: c.groupAdmins.filter(
-              (adminId) => getEntityId(adminId) !== targetUserId,
-            ),
-          };
-        }
-        return c;
-      }),
-    });
-
-    try {
-      await axiosInstance.patch(`/conversation/${convoId}/remove`, {
-        targetUserId,
-      });
-      toast.success("User removed from group");
-    } catch {
-      // Rollback
-      set({
-        activeConversation: prevActiveConversation,
-        conversations: prevConversations,
-      });
-      toast.error("Failed to remove user");
-    }
-  },
-
-  promoteToAdmin: async (convoId, targetUserId) => {
-    const { activeConversation, conversations } = get();
-    const prevActiveConversation = activeConversation;
-    const prevConversations = [...conversations];
-
-    if (activeConversation && activeConversation._id === convoId) {
-      const updatedAdmins = [...activeConversation.groupAdmins, targetUserId];
-      set({
-        activeConversation: {
-          ...activeConversation,
-          groupAdmins: updatedAdmins,
-        },
-      });
-    }
-
-    set({
-      conversations: conversations.map((c) => {
-        if (c._id === convoId) {
-          return { ...c, groupAdmins: [...c.groupAdmins, targetUserId] };
-        }
-        return c;
-      }),
-    });
-
-    try {
-      await axiosInstance.patch(`/conversation/${convoId}/promote`, {
-        targetUserId,
-      });
-      toast.success("Promoted to Admin");
-    } catch {
-      set({
-        activeConversation: prevActiveConversation,
-        conversations: prevConversations,
-      });
-      toast.error("Failed to promote user");
-    }
-  },
-
-  updateGroupMetadata: async (convoId, groupName, groupAvatar) => {
-    const { activeConversation, conversations } = get();
-    const prevActiveConversation = activeConversation;
-    const prevConversations = [...conversations];
-
-    const updatePayload = {};
-    if (groupName) updatePayload.groupName = groupName;
-    if (groupAvatar) updatePayload.groupAvatar = groupAvatar;
-
-    if (activeConversation && activeConversation._id === convoId) {
-      set({ activeConversation: { ...activeConversation, ...updatePayload } });
-    }
-
-    set({
-      conversations: conversations.map((c) => {
-        if (c._id === convoId) {
-          return { ...c, ...updatePayload };
-        }
-        return c;
-      }),
-    });
-
-    try {
-      await axiosInstance.patch(
-        `/conversation/${convoId}/metadata`,
-        updatePayload,
-      );
-      toast.success("Group metadata updated");
-    } catch {
-      set({
-        activeConversation: prevActiveConversation,
-        conversations: prevConversations,
-      });
-      toast.error("Failed to update group metadata");
-    }
-  },
-
-  // Socket listener handlers
-  handleIncomingGroupMemberRemoved: ({ convoId, targetUserId }) => {
-    const { activeConversation, conversations } = get();
-
-    // If the current user was the one removed from the group, they shouldn't see it anymore.
-    const currentUser = useAuthStore.getState().authUser;
-    if (currentUser && currentUser._id === targetUserId) {
-      set({ conversations: conversations.filter((c) => c._id !== convoId) });
+      // If we're viewing this conversation, update all messages from the other user
       if (activeConversation && activeConversation._id === convoId) {
-        set({ activeConversation: null, messages: [] });
-        toast.info("You were removed from a group");
-      }
-      return;
-    }
-
-    if (activeConversation && activeConversation._id === convoId) {
-      const updatedMembers = activeConversation.members.filter(
-        (m) => m._id !== targetUserId,
-      );
-      const updatedAdmins = activeConversation.groupAdmins.filter(
-        (adminId) => getEntityId(adminId) !== targetUserId,
-      );
-      set({
-        activeConversation: {
-          ...activeConversation,
-          members: updatedMembers,
-          groupAdmins: updatedAdmins,
-        },
-      });
-    }
-
-    set({
-      conversations: conversations.map((c) => {
-        if (c._id === convoId) {
-          return {
-            ...c,
-            members: c.members.filter((m) => m._id !== targetUserId),
-            groupAdmins: c.groupAdmins.filter(
-              (adminId) => getEntityId(adminId) !== targetUserId,
-            ),
-          };
-        }
-        return c;
-      }),
-    });
-  },
-
-  handleIncomingGroupMemberAdded: ({ convoId, updatedGroup }) => {
-    const { activeConversation, conversations } = get();
-    if (activeConversation && activeConversation._id === convoId) {
-      set({
-        activeConversation: {
-          ...activeConversation,
-          members: updatedGroup.members,
-          groupAdmins: updatedGroup.groupAdmins,
-        },
-      });
-    }
-
-    set({
-      conversations: conversations.map((c) => {
-        if (c._id === convoId) {
-          return {
-            ...c,
-            members: updatedGroup.members,
-            groupAdmins: updatedGroup.groupAdmins,
-          };
-        }
-        return c;
-      }),
-    });
-  },
-
-  handleIncomingGroupAdminPromoted: ({ convoId, targetUserId }) => {
-    const { activeConversation, conversations } = get();
-    if (activeConversation && activeConversation._id === convoId) {
-      if (
-        !activeConversation.groupAdmins.some(
-          (a) => getEntityId(a) === targetUserId,
-        )
-      ) {
-        const updatedAdmins = [...activeConversation.groupAdmins, targetUserId];
         set({
-          activeConversation: {
-            ...activeConversation,
-            groupAdmins: updatedAdmins,
-          },
+          messages: messages.map((msg) =>
+            msg.senderId !== seenBy ? { ...msg, status: "seen" } : msg,
+          ),
         });
       }
-    }
+    },
 
-    set({
-      conversations: conversations.map((c) => {
-        if (c._id === convoId) {
-          if (!c.groupAdmins.some((a) => getEntityId(a) === targetUserId)) {
-            return { ...c, groupAdmins: [...c.groupAdmins, targetUserId] };
+      // ─────────────────────────────────────────────────────────────────────────
+      // GROUP MANAGEMENT SOCKET HANDLERS
+      // ─────────────────────────────────────────────────────────────────────────
+
+      handleGroupKeyRotationRequired: async ({ convoId, newKeyEpoch }) => {
+        console.log(
+          `🔔 E2EE: Key rotation required for group ${convoId}, new epoch: ${newKeyEpoch}`,
+        );
+        await get().rotateSenderKey(convoId, newKeyEpoch);
+      },
+
+        handleIncomingGroupMemberRemoved: ({ convoId, targetUserId }) => {
+          const { authUser } = useAuthStore.getState();
+          const { activeConversation, conversations } = get();
+
+          // If we were removed, clear the active conversation
+          if (authUser._id.toString() === targetUserId.toString()) {
+            set({
+              conversations: conversations.filter(
+                (c) => c._id?.toString() !== convoId,
+              ),
+            });
+            if (activeConversation?._id?.toString() === convoId) {
+              set({ activeConversation: null, messages: [] });
+              toast.info("You were removed from this group");
+            }
+            return;
           }
-        }
-        return c;
-      }),
-    });
-  },
 
-  handleIncomingGroupMetadataUpdated: ({ convoId, updatePayload }) => {
-    const { activeConversation, conversations } = get();
-    if (activeConversation && activeConversation._id === convoId) {
-      set({
-        activeConversation: {
-          ...activeConversation,
-          groupName: updatePayload.groupName || activeConversation.groupName,
-          groupAvatar:
-            updatePayload.groupAvatar || activeConversation.groupAvatar,
+          // Update member lists for remaining members
+          set({
+            activeConversation:
+              activeConversation?._id?.toString() === convoId
+                ? {
+                  ...activeConversation,
+                  members: activeConversation.members.filter(
+                    (m) => (m._id ?? m).toString() !== targetUserId.toString(),
+                  ),
+                }
+                : activeConversation,
+            conversations: conversations.map((c) =>
+              c._id?.toString() === convoId
+                ? {
+                  ...c,
+                  members: c.members.filter(
+                    (m) => (m._id ?? m).toString() !== targetUserId.toString(),
+                  ),
+                }
+                : c,
+            ),
+          });
         },
-      });
-    }
-    set({
-      conversations: conversations.map((c) => {
-        if (c._id === convoId) {
-          return {
-            ...c,
-            groupName: updatePayload.groupName || c.groupName,
-            groupAvatar: updatePayload.groupAvatar || c.groupAvatar,
-          };
-        }
-        return c;
-      }),
-    });
-  },
 
-  // Clear chat state and E2EE caches (on logout)
-  clearChat: () => {
-    sharedKeyCache.clear();
-    publicKeyCache.clear();
-    pendingMessageQueue.clear();
-    senderKeyMutex.clear();
+          // Create or get a conversation with a user (used when starting a new chat)
+          createConversation: async (receiverId) => {
+            try {
+              const res = await axiosInstance.post("/conversation", { receiverId });
+              const conversation = res.data.data;
 
-    set({
-      conversations: [],
-      activeConversation: null,
-      messages: [],
-      onlineUsers: [],
-      typingUsers: [],
-      unreadCounts: {},
-    });
-  },
+              // Add to conversations list if not already there
+              const { conversations } = get();
+              const exists = conversations.find((c) => c._id === conversation._id);
+              if (!exists) {
+                set({ conversations: [conversation, ...conversations] });
+              }
+
+              // Set it as active
+              await get().setActiveConversation(conversation);
+              return conversation;
+            } catch (error) {
+              console.error("Failed to create conversation:", error);
+              toast.error("Failed to start conversation");
+              return null;
+            }
+          },
+
+            // Create a new group conversation
+            createGroupConversation: async (groupName, memberIds) => {
+              try {
+                const res = await axiosInstance.post("/conversation/group", {
+                  name: groupName,
+                  memberIds: memberIds,
+                });
+                const conversation = res.data.data;
+
+                const { conversations } = get();
+                set({ conversations: [conversation, ...conversations] });
+
+                await get().setActiveConversation(conversation);
+                return conversation;
+              } catch (error) {
+                console.error("Failed to create group conversation:", error);
+                toast.error(
+                  error.response?.data?.message || "Failed to create group chat",
+                );
+                return null;
+              }
+            },
+
+              // Load more historical messages for pagination
+              loadMoreMessages: async () => {
+                const { activeConversation, messages, page, hasMore, isLoadingMore } =
+                  get();
+                if (!activeConversation || !hasMore || isLoadingMore) return;
+
+                set({ isLoadingMore: true });
+                try {
+                  const nextPage = page + 1;
+                  const res = await axiosInstance.get(
+                    `/message/${activeConversation._id}?limit=20&page=${nextPage}`,
+                  );
+                  const { messages: newMessages, hasMore: nextHasMore } = res.data.data;
+
+                  set({
+                    messages: [...newMessages, ...messages],
+                    page: nextPage,
+                    hasMore: nextHasMore,
+                  });
+                } catch (error) {
+                  console.error("Failed to load more messages:", error);
+                  toast.error("Failed to load older messages");
+                } finally {
+                  set({ isLoadingMore: false });
+                }
+              },
+
+                //soft-delete message (delete for everyone)
+                deleteMessage: async (messageId) => {
+                  set({ isDeleting: true });
+                  try {
+                    await axiosInstance.patch(`/message/${messageId}/delete`);
+                    toast.success("Message deleted for you");
+                  } catch (error) {
+                    console.error("Failed to delete message:", error);
+                    toast.error("Failed to delete message");
+                  } finally {
+                    set({ isDeleting: false });
+                  }
+                },
+                  // Alias for clarity
+                  deleteMessageForEveryone: async (messageId) => {
+                    try {
+                      await deleteMessageForEveryoneAPI(messageId);
+                      toast.success("Message deleted for everyone");
+                    } catch (error) {
+                      console.error("Failed to delete for everyone:", error);
+                      toast.error("Failed to delete for everyone");
+                    }
+                  },
+
+                    deleteMessageForMe: async (messageId) => {
+                      set({ isDeleting: true });
+                      try {
+                        await deleteMessageForMeAPI(messageId);
+                        toast.success("Message deleted for you");
+                        // The socket event will trigger markMessagesAsDeleted locally
+                      } catch (error) {
+                        console.error("Failed to delete message for you:", error);
+                        toast.error("Failed to delete message");
+                      } finally {
+                        set({ isDeleting: false });
+                      }
+                    },
+
+                      markMessagesAsDeleted: (messageId, convoId, permanently) => {
+                        const { conversations, activeConversation, messages } = get();
+
+                        let newMessages = messages;
+                        if (activeConversation && activeConversation._id === convoId) {
+                          if (permanently) {
+                            newMessages = messages.map((msg) =>
+                              msg._id === messageId
+                                ? {
+                                  ...msg,
+                                  deletedForEveryone: true,
+                                  text: "Message deleted",
+                                  image: null,
+                                  document: null,
+                                  audio: null,
+                                }
+                                : msg,
+                            );
+                          } else {
+                            newMessages = messages.filter((msg) => msg._id !== messageId);
+                          }
+                          set({ messages: newMessages });
+                        }
+
+                        set({
+                          conversations: conversations.map((c) => {
+                            if (c._id === convoId) {
+                              let sidebarMessageText = c.lastMessage;
+
+                              if (activeConversation && activeConversation._id === convoId) {
+                                if (newMessages.length > 0) {
+                                  const lastMsg = newMessages[newMessages.length - 1];
+                                  sidebarMessageText = lastMsg.deletedForEveryone
+                                    ? "Message deleted"
+                                    : lastMsg.text ||
+                                    (lastMsg.image
+                                      ? "📷 Image"
+                                      : lastMsg.audio?.url
+                                        ? "🎵 Audio"
+                                        : lastMsg.document?.url
+                                          ? "📎 Document"
+                                          : "");
+                                } else {
+                                  sidebarMessageText = "No messages yet";
+                                }
+                              } else if (permanently) {
+                                sidebarMessageText = "Message deleted";
+                              }
+
+                              return {
+                                ...c,
+                                lastMessage: sidebarMessageText,
+                                updatedAt: new Date().toISOString(),
+                              };
+                            }
+                            return c;
+                          }),
+                        });
+                      },
+                        //Edit message
+                        editMessage: async (messageId, newText) => {
+                          try {
+                            const res = await axiosInstance.patch(`/message/${messageId}/edit`, {
+                              text: newText,
+                            });
+                            const updatedMessage = res.data.data;
+
+                            // Local State Mutation (Pessimistic UI Sync on sender side)
+                            const updatedMessages = get().messages.map((msg) =>
+                              msg._id === messageId ? updatedMessage : msg,
+                            );
+                            set({ messages: updatedMessages });
+
+                            const lastMessage = updatedMessages[updatedMessages.length - 1];
+                            if (lastMessage?._id === messageId) {
+                              // Synchronize Sidebar list view item reference instantly
+                              const updatedConversations = get().conversations.map((c) =>
+                                c._id === updatedMessage.convoId
+                                  ? {
+                                    ...c,
+                                    lastMessage: newText,
+                                    updatedAt: new Date().toISOString(),
+                                  }
+                                  : c,
+                              );
+                              set({ conversations: updatedConversations });
+                            }
+                            return true;
+                          } catch (error) {
+                            console.error("Failed executing edit payload", error);
+                            toast.error(
+                              error.response?.data?.message || "Failed to save message edits",
+                            );
+                            return false;
+                          }
+                        },
+                          // Real-time Event Receiver Handler invoked via socket connection mapping
+                          updateIncomingEditMessage: (editedMessage) => {
+                            const { activeConversation, messages, conversations } = get();
+                            const messageId = getEntityId(editedMessage) || editedMessage.messageId;
+
+                            // If the message belongs to the currently active conversation (the one open in chat window)
+                            if (
+                              activeConversation &&
+                              activeConversation._id === editedMessage.convoId
+                            ) {
+                              // Update the message in the messages array
+                              set({
+                                messages: messages.map((msg) =>
+                                  msg._id === messageId ? editedMessage : msg,
+                                ),
+                              });
+                            }
+
+                            const lastMessage = messages[messages.length - 1];
+                            if (
+                              activeConversation?._id === editedMessage.convoId &&
+                              lastMessage?._id === messageId
+                            ) {
+                              set({
+                                conversations: conversations.map((c) =>
+                                  c._id === editedMessage.convoId
+                                    ? {
+                                      ...c,
+                                      lastMessage: editedMessage.text,
+                                      updatedAt: editedMessage.updatedAt,
+                                    }
+                                    : c,
+                                ),
+                              });
+                            }
+                          },
+
+                            sendToggleReaction: async (messageId, emoji) => {
+                              try {
+                                // Execute the request via the HTTP pipeline
+                                const res = await axiosInstance.post(`/message/${messageId}/react`, {
+                                  emoji,
+                                });
+                                const serverReactions = res.data.data;
+
+                                // Optimistic/Pessimistic reconciliation on sender node instantly
+                                const structuralRebuild = get().messages.map((m) =>
+                                  m._id === messageId ? { ...m, reactions: serverReactions } : m,
+                                );
+                                set({ messages: structuralRebuild });
+                              } catch (error) {
+                                console.error("Failed to apply emoji selection matrix sequence: ", error);
+                              }
+                            },
+
+                              // Real-time socket receiver event listener callback hook
+                              updateIncomingReaction: ({ messageId, reactions }) => {
+                                const messages = get().messages;
+                                const messageIndex = messages.findIndex((msg) => msg._id === messageId);
+                                if (messageIndex > -1) {
+                                  const updatedMessages = [...messages];
+                                  updatedMessages[messageIndex] = {
+                                    ...updatedMessages[messageIndex],
+                                    reactions,
+                                  };
+                                  set({ messages: updatedMessages });
+                                }
+                              },
+
+                                // Search users
+                                searchUsers: async (keyword) => {
+                                  if (!keyword.trim()) return [];
+                                  try {
+                                    const res = await axiosInstance.get(`/user/search?search=${keyword}`);
+                                    return res.data.data;
+                                  } catch (error) {
+                                    console.error("Failed to search users:", error);
+                                    return [];
+                                  }
+                                },
+
+                                  // Group actions
+                                  removeGroupMember: async (convoId, targetUserId) => {
+                                    const { activeConversation, conversations } = get();
+                                    // Save previous state for rollback
+                                    const prevActiveConversation = activeConversation;
+                                    const prevConversations = [...conversations];
+
+                                    // Optimistic UI update
+                                    if (activeConversation && activeConversation._id === convoId) {
+                                      const updatedMembers = activeConversation.members.filter(
+                                        (m) => m._id !== targetUserId,
+                                      );
+                                      const updatedAdmins = activeConversation.groupAdmins.filter(
+                                        (adminId) => getEntityId(adminId) !== targetUserId,
+                                      );
+                                      set({
+                                        activeConversation: {
+                                          ...activeConversation,
+                                          members: updatedMembers,
+                                          groupAdmins: updatedAdmins,
+                                        },
+                                      });
+                                    }
+
+                                    set({
+                                      conversations: conversations.map((c) => {
+                                        if (c._id === convoId) {
+                                          return {
+                                            ...c,
+                                            members: c.members.filter((m) => m._id !== targetUserId),
+                                            groupAdmins: c.groupAdmins.filter(
+                                              (adminId) => getEntityId(adminId) !== targetUserId,
+                                            ),
+                                          };
+                                        }
+                                        return c;
+                                      }),
+                                    });
+
+                                    try {
+                                      await axiosInstance.patch(`/conversation/${convoId}/remove`, {
+                                        targetUserId,
+                                      });
+                                      toast.success("User removed from group");
+                                    } catch {
+                                      // Rollback
+                                      set({
+                                        activeConversation: prevActiveConversation,
+                                        conversations: prevConversations,
+                                      });
+                                      toast.error("Failed to remove user");
+                                    }
+                                  },
+
+                                    promoteToAdmin: async (convoId, targetUserId) => {
+                                      const { activeConversation, conversations } = get();
+                                      const prevActiveConversation = activeConversation;
+                                      const prevConversations = [...conversations];
+
+                                      if (activeConversation && activeConversation._id === convoId) {
+                                        const updatedAdmins = [...activeConversation.groupAdmins, targetUserId];
+                                        set({
+                                          activeConversation: {
+                                            ...activeConversation,
+                                            groupAdmins: updatedAdmins,
+                                          },
+                                        });
+                                      }
+
+                                      set({
+                                        conversations: conversations.map((c) => {
+                                          if (c._id === convoId) {
+                                            return { ...c, groupAdmins: [...c.groupAdmins, targetUserId] };
+                                          }
+                                          return c;
+                                        }),
+                                      });
+
+                                      try {
+                                        await axiosInstance.patch(`/conversation/${convoId}/promote`, {
+                                          targetUserId,
+                                        });
+                                        toast.success("Promoted to Admin");
+                                      } catch {
+                                        set({
+                                          activeConversation: prevActiveConversation,
+                                          conversations: prevConversations,
+                                        });
+                                        toast.error("Failed to promote user");
+                                      }
+                                    },
+
+                                      updateGroupMetadata: async (convoId, groupName, groupAvatar) => {
+                                        const { activeConversation, conversations } = get();
+                                        const prevActiveConversation = activeConversation;
+                                        const prevConversations = [...conversations];
+
+                                        const updatePayload = {};
+                                        if (groupName) updatePayload.groupName = groupName;
+                                        if (groupAvatar) updatePayload.groupAvatar = groupAvatar;
+
+                                        if (activeConversation && activeConversation._id === convoId) {
+                                          set({ activeConversation: { ...activeConversation, ...updatePayload } });
+                                        }
+
+                                        set({
+                                          conversations: conversations.map((c) => {
+                                            if (c._id === convoId) {
+                                              return { ...c, ...updatePayload };
+                                            }
+                                            return c;
+                                          }),
+                                        });
+
+                                        try {
+                                          await axiosInstance.patch(
+                                            `/conversation/${convoId}/metadata`,
+                                            updatePayload,
+                                          );
+                                          toast.success("Group metadata updated");
+                                        } catch {
+                                          set({
+                                            activeConversation: prevActiveConversation,
+                                            conversations: prevConversations,
+                                          });
+                                          toast.error("Failed to update group metadata");
+                                        }
+                                      },
+
+                                        // Socket listener handlers
+                                        handleIncomingGroupMemberRemoved: ({ convoId, targetUserId }) => {
+                                          const { activeConversation, conversations } = get();
+
+                                          // If the current user was the one removed from the group, they shouldn't see it anymore.
+                                          const currentUser = useAuthStore.getState().authUser;
+                                          if (currentUser && currentUser._id === targetUserId) {
+                                            set({ conversations: conversations.filter((c) => c._id !== convoId) });
+                                            if (activeConversation && activeConversation._id === convoId) {
+                                              set({ activeConversation: null, messages: [] });
+                                              toast.info("You were removed from a group");
+                                            }
+                                            return;
+                                          }
+
+                                          if (activeConversation && activeConversation._id === convoId) {
+                                            const updatedMembers = activeConversation.members.filter(
+                                              (m) => m._id !== targetUserId,
+                                            );
+                                            const updatedAdmins = activeConversation.groupAdmins.filter(
+                                              (adminId) => getEntityId(adminId) !== targetUserId,
+                                            );
+                                            set({
+                                              activeConversation: {
+                                                ...activeConversation,
+                                                members: updatedMembers,
+                                                groupAdmins: updatedAdmins,
+                                              },
+                                            });
+                                          }
+
+                                          set({
+                                            conversations: conversations.map((c) => {
+                                              if (c._id === convoId) {
+                                                return {
+                                                  ...c,
+                                                  members: c.members.filter((m) => m._id !== targetUserId),
+                                                  groupAdmins: c.groupAdmins.filter(
+                                                    (adminId) => getEntityId(adminId) !== targetUserId,
+                                                  ),
+                                                };
+                                              }
+                                              return c;
+                                            }),
+                                          });
+                                        },
+
+                                          handleIncomingGroupMemberAdded: ({ convoId, updatedGroup }) => {
+                                            const { activeConversation, conversations } = get();
+                                            if (activeConversation && activeConversation._id === convoId) {
+                                              set({
+                                                activeConversation: {
+                                                  ...activeConversation,
+                                                  members: updatedGroup.members,
+                                                  groupAdmins: updatedGroup.groupAdmins,
+                                                },
+                                              });
+                                            }
+
+                                            set({
+                                              conversations: conversations.map((c) => {
+                                                if (c._id === convoId) {
+                                                  return {
+                                                    ...c,
+                                                    members: updatedGroup.members,
+                                                    groupAdmins: updatedGroup.groupAdmins,
+                                                  };
+                                                }
+                                                return c;
+                                              }),
+                                            });
+                                          },
+
+                                            handleIncomingGroupAdminPromoted: ({ convoId, targetUserId }) => {
+                                              const { activeConversation, conversations } = get();
+                                              if (activeConversation && activeConversation._id === convoId) {
+                                                if (
+                                                  !activeConversation.groupAdmins.some(
+                                                    (a) => getEntityId(a) === targetUserId,
+                                                  )
+                                                ) {
+                                                  const updatedAdmins = [...activeConversation.groupAdmins, targetUserId];
+                                                  set({
+                                                    activeConversation: {
+                                                      ...activeConversation,
+                                                      groupAdmins: updatedAdmins,
+                                                    },
+                                                  });
+                                                }
+                                              }
+
+                                              set({
+                                                conversations: conversations.map((c) => {
+                                                  if (c._id === convoId) {
+                                                    if (!c.groupAdmins.some((a) => getEntityId(a) === targetUserId)) {
+                                                      return { ...c, groupAdmins: [...c.groupAdmins, targetUserId] };
+                                                    }
+                                                  }
+                                                  return c;
+                                                }),
+                                              });
+                                            },
+
+                                              handleIncomingGroupMetadataUpdated: ({ convoId, updatePayload }) => {
+                                                const { activeConversation, conversations } = get();
+                                                if (activeConversation && activeConversation._id === convoId) {
+                                                  set({
+                                                    activeConversation: {
+                                                      ...activeConversation,
+                                                      groupName: updatePayload.groupName || activeConversation.groupName,
+                                                      groupAvatar:
+                                                        updatePayload.groupAvatar || activeConversation.groupAvatar,
+                                                    },
+                                                  });
+                                                }
+                                                set({
+                                                  conversations: conversations.map((c) => {
+                                                    if (c._id === convoId) {
+                                                      return {
+                                                        ...c,
+                                                        groupName: updatePayload.groupName || c.groupName,
+                                                        groupAvatar: updatePayload.groupAvatar || c.groupAvatar,
+                                                      };
+                                                    }
+                                                    return c;
+                                                  }),
+                                                });
+                                              },
+
+                                                // Clear chat state and E2EE caches (on logout)
+                                                clearChat: () => {
+                                                  sharedKeyCache.clear();
+                                                  publicKeyCache.clear();
+                                                  pendingMessageQueue.clear();
+                                                  senderKeyMutex.clear();
+
+                                                  set({
+                                                    conversations: [],
+                                                    activeConversation: null,
+                                                    messages: [],
+                                                    onlineUsers: [],
+                                                    typingUsers: [],
+                                                    unreadCounts: {},
+                                                  });
+                                                },
 }));
 
 export default useChatStore;
