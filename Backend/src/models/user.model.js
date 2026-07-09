@@ -43,6 +43,29 @@ const userSchema = new Schema(
       // This is the ECDH public key in Base64/SPKI format
       // It's perfectly safe to store publicly — that's the entire point
     },
+    about: {
+      type: String,
+      default: "",
+    },
+    socialLinks: {
+      github: { type: String, default: "" },
+      linkedin: { type: String, default: "" },
+      twitter: { type: String, default: "" },
+      instagram: { type: String, default: "" },
+      website: { type: String, default: "" },
+    },
+    blockedUsers: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    blockedBy: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true },
 );

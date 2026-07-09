@@ -221,8 +221,26 @@ const useChatStore = create((set, get) => ({
       );
       return { ...message, decryptedText: plaintext };
     } catch (error) {
-      console.error("Failed to decrypt 1:1 message:", message._id, error.message);
-      return { ...message, decryptedText: "[Unable to decrypt]" };
+      console.warn(
+        `E2EE: 1:1 decrypt failed for ${message._id}, retrying with a fresh key fetch (cached key may be stale)`,
+      );
+
+      // Invalidate both caches and re-derive from scratch. If the other
+      // party's public key changed since we cached it, this fixes it.
+      // If it STILL fails after this, the mismatch is real (not caching)
+      // and needs the key-regeneration path checked, not a retry.
+      sharedKeyCache.delete(otherUserId);
+      publicKeyCache.delete(otherUserId);
+
+      try {
+        const freshKey = await get().getSharedKey(otherUserId);
+        const plaintext = await decryptMessage(message.ciphertext, message.iv, freshKey);
+        console.log(`✅ E2EE: Retry succeeded for ${message._id} — cached key was stale`);
+        return { ...message, decryptedText: plaintext };
+      } catch (retryError) {
+        console.error("Failed to decrypt 1:1 message after retry:", message._id, retryError.message);
+        return { ...message, decryptedText: "[Unable to decrypt]" };
+      }
     }
   },
 
@@ -256,9 +274,11 @@ const useChatStore = create((set, get) => ({
         return { ...message, decryptedText: plaintext };
       } catch (error) {
         console.warn(
-          `E2EE: Self-decrypt failed for message ${message._id}: ${error.message}`,
+          `E2EE: Self-decrypt failed for message ${message._id}: ${error.message}\n` +
+            `  message.counter=${message.counter}, message.keyVersion=${message.keyVersion}\n` +
+            `  local key: counter=${ownKeyData.counter}, version=${ownKeyData.version}`,
         );
-        return { ...message, decryptedText: "[Unable to decrypt]" };
+        return { ...message, decryptedText: "[Message sent from another of your devices]" };
       }
     }
 
@@ -780,22 +800,30 @@ sendMessage: async (text, file = null) => {
 
     // Append with plaintext immediately — we already have it, no need to decrypt
     const sentMessage = { ...res.data.data, decryptedText: text };
-    set({ messages: [...messages, sentMessage] });
+    set((state) => {
+      const existingIndex = state.messages.findIndex((m) => m._id === sentMessage._id);
+      if (existingIndex >= 0) {
+        const newMessages = [...state.messages];
+        newMessages[existingIndex] = sentMessage;
+        return { messages: newMessages };
+      }
+      return { messages: [...state.messages, sentMessage] };
+    });
 
     const lastMessageLabel = text || (file ? "📎 Attachment" : "New message");
 
     // Update sidebar
-    set({
-      conversations: get().conversations.map((c) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
         c._id === activeConversation._id
           ? {
-            ...c,
-            lastMessage: lastMessageLabel,
-            updatedAt: new Date().toISOString(),
-          }
+              ...c,
+              lastMessage: lastMessageLabel,
+              updatedAt: new Date().toISOString(),
+            }
           : c,
       ),
-    });
+    }));
   } catch (err) {
     console.error("Send failed:", err);
     if (err.message?.includes("hasn't set up encryption")) {
@@ -869,7 +897,15 @@ sendMessage: async (text, file = null) => {
         appendedMessage = await get().decryptOneToOneMessage(message, otherId);
       }
 
-      set({ messages: [...messages, appendedMessage] });
+      set((state) => {
+        const existingIndex = state.messages.findIndex((m) => m._id === appendedMessage._id);
+        if (existingIndex >= 0) {
+          const newMessages = [...state.messages];
+          newMessages[existingIndex] = appendedMessage;
+          return { messages: newMessages };
+        }
+        return { messages: [...state.messages, appendedMessage] };
+      });
       decryptedMessage = appendedMessage;
     } else {
       const convo = currentConversations.find((c) => c._id === message.convoId);
@@ -917,12 +953,12 @@ sendMessage: async (text, file = null) => {
               : "New message");
       toast(`New message from ${senderName}`, { description: previewText });
 
-      set({
+      set((state) => ({
         unreadCounts: {
-          ...unreadCounts,
-          [message.convoId]: (unreadCounts[message.convoId] || 0) + 1,
+          ...state.unreadCounts,
+          [message.convoId]: (state.unreadCounts[message.convoId] || 0) + 1,
         },
-      });
+      }));
     }
 
     // Update sidebar lastMessage for the relevant conversation
@@ -937,17 +973,17 @@ sendMessage: async (text, file = null) => {
             ? "📎 Document"
             : "");
 
-    set({
-      conversations: currentConversations.map((c) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
         c._id === message.convoId
           ? {
-            ...c,
-            lastMessage: sidebarMessageText,
-            updatedAt: new Date().toISOString(),
-          }
+              ...c,
+              lastMessage: sidebarMessageText,
+              updatedAt: new Date().toISOString(),
+            }
           : c,
       ),
-    });
+    }));
   },
 
     // Phase 2.5 #3: Mark messages as seen in the UI (called from socketStore)

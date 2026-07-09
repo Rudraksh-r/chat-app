@@ -27,6 +27,7 @@ import {
   Download,
   Sun,
   Moon,
+  Palette,
 } from "lucide-react";
 import { formatTime, formatTimeAgo, cn } from "../lib/utils";
 import { Button, Avatar } from "../components/ui/index";
@@ -36,12 +37,15 @@ import useChatStore from "../store/chatStore";
 import useSocketStore from "../store/socketStore";
 import useThemeStore from "../store/themeStore";
 import { toast } from "sonner";
+import ProfileModal from "../components/ProfileModal";
+import UserInfoModal from "../components/UserInfoModal";
+import ThemePicker, { CHAT_THEMES } from "../components/ThemePicker";
 
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 export function ChatLayout() {
   const { authUser, logout } = useAuthStore();
-  const { theme, toggleTheme } = useThemeStore();
+  const { theme, toggleTheme, chatThemes } = useThemeStore();
   const {
     conversations,
     activeConversation,
@@ -125,6 +129,24 @@ export function ChatLayout() {
   const [isEditingGroupName, setIsEditingGroupName] = useState(false);
   const [editGroupNameText, setEditGroupNameText] = useState("");
   const groupAvatarInputRef = useRef(null);
+
+  // Profile preview, info, and theme picker modals
+  const [profileModalUserId, setProfileModalUserId] = useState(null);
+  const [userInfoProfile, setUserInfoProfile] = useState(null);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+
+  // Compute active chat theme styles
+  const activeChatThemeKey = activeConversation?._id ? (chatThemes[activeConversation._id] || 'default') : 'default';
+  const activeChatThemeConfig = CHAT_THEMES[activeChatThemeKey] || CHAT_THEMES.default;
+  const activeChatStyle = activeChatThemeKey !== 'default' ? {
+    background: activeChatThemeConfig.wallpaper && activeChatThemeConfig.wallpaper !== 'none'
+      ? activeChatThemeConfig.wallpaper
+      : activeChatThemeConfig.backgroundColor,
+    '--bubble-sent': activeChatThemeConfig.bubbleColor,
+    '--bubble-received': 'rgba(255,255,255,0.10)',
+    '--bubble-sent-foreground': '#FFFFFF',
+    '--bubble-received-foreground': '#FFFFFF',
+  } : {};
 
   useEffect(() => {
     const updateCurrentTime = () => setCurrentTime(Date.now());
@@ -656,21 +678,35 @@ export function ChatLayout() {
                 >
                   <ChevronLeft className="size-6" />
                 </Button>
-                <Avatar
-                  src={chatAvatar}
-                  status={
-                    activeConversation.isGroupChat
-                      ? undefined
-                      : isOtherOnline
-                        ? "online"
-                        : "offline"
-                  }
-                />
+                <button
+                  type="button"
+                  className="rounded-full"
+                  onClick={() => {
+                    if (!activeConversation.isGroupChat && otherUser?._id) {
+                      setProfileModalUserId(otherUser._id);
+                    } else if (activeConversation.isGroupChat) {
+                      setIsGroupInfoOpen(true);
+                    }
+                  }}
+                >
+                  <Avatar
+                    src={chatAvatar}
+                    status={
+                      activeConversation.isGroupChat
+                        ? undefined
+                        : isOtherOnline
+                          ? "online"
+                          : "offline"
+                    }
+                  />
+                </button>
                 <div
                   className="group cursor-pointer"
                   onClick={() => {
                     if (activeConversation?.isGroupChat) {
                       setIsGroupInfoOpen(true);
+                    } else if (otherUser?._id) {
+                      setProfileModalUserId(otherUser._id);
                     }
                   }}
                 >
@@ -704,9 +740,11 @@ export function ChatLayout() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-primary hover:bg-secondary/70"
+                  className="text-label-secondary hover:text-primary hover:bg-secondary/70"
+                  onClick={() => setShowThemePicker(true)}
+                  title="Chat theme"
                 >
-                  <MoreVertical className="size-5" />
+                  <Palette className="size-5" />
                 </Button>
               </div>
             </Motion.div>
@@ -716,6 +754,7 @@ export function ChatLayout() {
               ref={messagesContainerRef}
               onScroll={handleScroll}
               className="custom-scrollbar flex-1 space-y-3 overflow-y-auto px-4 py-5 sm:px-6"
+              style={activeChatStyle}
             >
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
@@ -846,14 +885,24 @@ export function ChatLayout() {
                         >
                           {showAvatar ? (
                             <div className="shrink-0 mt-auto">
-                              <Avatar
-                                src={
-                                  isMe
-                                    ? getAvatarUrl(authUser)
-                                    : getAvatarUrl(sender)
-                                }
-                                size="sm"
-                              />
+                              <button
+                                type="button"
+                                className="rounded-full"
+                                onClick={() => {
+                                  if (!isMe && sender?._id) {
+                                    setProfileModalUserId(sender._id);
+                                  }
+                                }}
+                              >
+                                <Avatar
+                                  src={
+                                    isMe
+                                      ? getAvatarUrl(authUser)
+                                      : getAvatarUrl(sender)
+                                  }
+                                  size="sm"
+                                />
+                              </button>
                             </div>
                           ) : (
                             <div className="w-8 shrink-0" />
@@ -1915,12 +1964,20 @@ export function ChatLayout() {
                         className="flex min-h-[64px] items-center justify-between rounded-2xl bg-card px-3 py-2 transition-colors hover:bg-secondary/60"
                       >
                         <div className="flex items-center gap-3">
-                          <Avatar
-                            src={getAvatarUrl(member)}
-                            status={
-                              isUserOnline(member._id) ? "online" : "offline"
-                            }
-                          />
+                          <button
+                            type="button"
+                            className="rounded-full"
+                            onClick={() => {
+                              if (!isMe) setProfileModalUserId(member._id);
+                            }}
+                          >
+                            <Avatar
+                              src={getAvatarUrl(member)}
+                              status={
+                                isUserOnline(member._id) ? "online" : "offline"
+                              }
+                            />
+                          </button>
                           <div>
                             <div className="flex items-center gap-2">
                               <p className="text-[15px] font-medium leading-5 text-foreground">
@@ -1985,6 +2042,34 @@ export function ChatLayout() {
           </Motion.div>
         )}
       </AnimatePresence>
+
+      {/* Profile Preview Modal */}
+      {profileModalUserId && (
+        <ProfileModal
+          userId={profileModalUserId}
+          onClose={() => setProfileModalUserId(null)}
+          onOpenInfo={(profile) => {
+            setUserInfoProfile(profile);
+            setProfileModalUserId(null);
+          }}
+        />
+      )}
+
+      {/* Full User Info Modal */}
+      {userInfoProfile && (
+        <UserInfoModal
+          profile={userInfoProfile}
+          onClose={() => setUserInfoProfile(null)}
+        />
+      )}
+
+      {/* Chat Theme Picker */}
+      {showThemePicker && activeConversation && (
+        <ThemePicker
+          chatId={activeConversation._id}
+          onClose={() => setShowThemePicker(false)}
+        />
+      )}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;

@@ -6,6 +6,8 @@ import useChatStore from "./chatStore";
 import { generateKeyPair, exportPublicKey } from "../lib/crypto";
 import { getPrivateKey, storePrivateKey } from "../lib/keyStorage";
 
+let cryptoSetupPromise = null;
+
 const useAuthStore = create((set, get) => ({
   // State
   authUser: null,
@@ -19,39 +21,51 @@ const useAuthStore = create((set, get) => ({
   _setupCrypto: async (user) => {
     if (!user?._id) return false;
 
-    try {
-      const existingPrivateKey = await getPrivateKey(user._id);
-      const hasServerPublicKey = Boolean(user.publicKey);
+    // Prevents two concurrent calls (React StrictMode's double-effect,
+    // or checkAuth + login racing) from each generating a DIFFERENT
+    // keypair and racing to upload — which leaves the local private key
+    // and server public key permanently out of sync.
+    if (cryptoSetupPromise) return cryptoSetupPromise;
 
-      if (existingPrivateKey && hasServerPublicKey) {
-        console.log("✅ E2EE: Existing keypair found in IndexedDB");
+    cryptoSetupPromise = (async () => {
+      try {
+        const existingPrivateKey = await getPrivateKey(user._id);
+        const hasServerPublicKey = Boolean(user.publicKey);
+
+        if (existingPrivateKey && hasServerPublicKey) {
+          console.log("✅ E2EE: Existing keypair found in IndexedDB");
+          return true;
+        }
+
+        if (existingPrivateKey && !hasServerPublicKey) {
+          console.warn(
+            "⚠️ E2EE: Local private key found but server public key missing. Regenerating keypair.",
+          );
+        } else {
+          console.log(
+            "🔑 E2EE: No keypair found — generating new keypair for this device",
+          );
+        }
+
+        const keyPair = await generateKeyPair();
+        const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
+
+        await storePrivateKey(user._id, keyPair.privateKey);
+        await axiosInstance.put("/user/public-key", {
+          publicKey: publicKeyB64,
+        });
+
+        console.log("✅ E2EE: New keypair generated and public key uploaded");
         return true;
+      } catch (error) {
+        console.error("❌ E2EE: Key generation/setup failed:", error);
+        return false;
+      } finally {
+        cryptoSetupPromise = null;
       }
+    })();
 
-      if (existingPrivateKey && !hasServerPublicKey) {
-        console.warn(
-          "⚠️ E2EE: Local private key found but server public key missing. Regenerating keypair.",
-        );
-      } else {
-        console.log(
-          "🔑 E2EE: No keypair found — generating new keypair for this device",
-        );
-      }
-
-      const keyPair = await generateKeyPair();
-      const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
-
-      await storePrivateKey(user._id, keyPair.privateKey);
-      await axiosInstance.put("/user/public-key", {
-        publicKey: publicKeyB64,
-      });
-
-      console.log("✅ E2EE: New keypair generated and public key uploaded");
-      return true;
-    } catch (error) {
-      console.error("❌ E2EE: Key generation/setup failed:", error);
-      return false;
-    }
+    return cryptoSetupPromise;
   },
 
   ensureKeyPair: async (userId, hasServerPublicKey = true) => {
@@ -188,6 +202,22 @@ const useAuthStore = create((set, get) => ({
       const message =
         error.response?.data?.message || "Failed to update avatar";
       toast.error(message);
+      return false;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  changePassword: async (oldPassword, newPassword) => {
+    set({ isLoading: true });
+    try {
+      await axiosInstance.put("/auth/change-password", {
+        oldPassword,
+        newPassword,
+      });
+      toast.success("Password changed successfully!");
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to change password");
       return false;
     } finally {
       set({ isLoading: false });

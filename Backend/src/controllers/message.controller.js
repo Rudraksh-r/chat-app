@@ -1,6 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Message } from "../models/message.model.js";
 import { Conversation } from "../models/conversation.model.js";
+import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { getReceiverSocketIds, io } from "../socket/socket.js";
@@ -35,6 +36,23 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   if (!isSenderMember) {
     throw new ApiError(403, "You are not a member of this conversation");
+  }
+
+  // Enforce block rules for direct messages
+  if (!convoExists.isGroupChat) {
+    const otherMemberId = convoExists.members.find(
+      (m) => m.toString() !== senderId.toString()
+    );
+    if (otherMemberId) {
+      const otherUser = await User.findById(otherMemberId);
+      const currentUser = await User.findById(senderId);
+      if (
+        (currentUser.blockedUsers && currentUser.blockedUsers.some(id => id.toString() === otherMemberId.toString())) ||
+        (otherUser.blockedUsers && otherUser.blockedUsers.some(id => id.toString() === senderId.toString()))
+      ) {
+        throw new ApiError(400, "Message transmission blocked. Check block status.");
+      }
+    }
   }
 
   // ── Multi-format upload pipeline ─────────────────────────────

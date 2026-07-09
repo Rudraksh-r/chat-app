@@ -30,6 +30,14 @@ const useThemeStore = create((set) => ({
     } else {
       document.documentElement.classList.remove('dark');
     }
+  },
+  chatThemes: JSON.parse(localStorage.getItem('chatThemes') || '{}'),
+  setChatTheme: (chatId, themeName) => {
+    set((state) => {
+      const updated = { ...state.chatThemes, [chatId]: themeName };
+      localStorage.setItem('chatThemes', JSON.stringify(updated));
+      return { chatThemes: updated };
+    });
   }
 }));
 

@@ -1,5 +1,6 @@
 import { Conversation } from "../models/conversation.model.js";
 import { GroupAuditLog } from "../models/groupAuditLog.model.js";
+import { User } from "../models/user.model.js";
 import { io, getReceiverSocketIds } from "../socket/socket.js";
 import { SOCKET_EVENTS } from "../socket/events.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -33,6 +34,18 @@ const createConvo = asyncHandler(async (req, res) => {
   }).populate("members", "fullName username email avatar lastSeen");
 
   if (!conversation) {
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      throw new ApiError(404, "Receiver not found");
+    }
+    const sender = await User.findById(senderId);
+    if (
+      (sender.blockedUsers && sender.blockedUsers.some(id => id.toString() === receiverId.toString())) ||
+      (receiver.blockedUsers && receiver.blockedUsers.some(id => id.toString() === senderId.toString()))
+    ) {
+      throw new ApiError(400, "Cannot start a new conversation. Check block status.");
+    }
+
     conversation = await Conversation.create({
       members: [senderId, receiverId],
     });

@@ -11,7 +11,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+        origin: [process.env.CORS_ORIGIN, "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
         methods: ["GET", "POST"],
         credentials: true,
     },
@@ -99,6 +99,30 @@ function parseCookieToken(cookieStr) {
     return match ? match.split("=")[1]?.trim() : null;
 }
 
+export const broadcastOnlineUsers = async () => {
+    try {
+        const onlineUserIds = Object.keys(userSocketMap);
+        for (const targetUserId of onlineUserIds) {
+            const targetUser = await User.findById(targetUserId).select("blockedUsers blockedBy");
+            if (!targetUser) continue;
+            
+            const filteredOnlineUsers = onlineUserIds.filter(userId => {
+                const isBlocked = 
+                    (targetUser.blockedUsers && targetUser.blockedUsers.some(id => id.toString() === userId)) ||
+                    (targetUser.blockedBy && targetUser.blockedBy.some(id => id.toString() === userId));
+                return !isBlocked;
+            });
+
+            const sockets = getReceiverSocketIds(targetUserId);
+            sockets.forEach(socketId => {
+                io.to(socketId).emit(SOCKET_EVENTS.USER_ONLINE, filteredOnlineUsers);
+            });
+        }
+    } catch (error) {
+        console.error("❌ broadcastOnlineUsers error:", error.message);
+    }
+};
+
 // ─────────────────────────────────────────────────────────
 // Main Connection Handler
 // ─────────────────────────────────────────────────────────
@@ -112,8 +136,8 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
     }
     userSocketMap[userId].add(socket.id);
 
-    // Broadcast updated online users list
-    io.emit(SOCKET_EVENTS.USER_ONLINE, Object.keys(userSocketMap));
+    // Broadcast updated online users list (filtered by blocks)
+    broadcastOnlineUsers().catch(err => console.error("Error broadcasting online users:", err));
 
     // ─────────────────────────────────────────────────────
     // Phase 2.5 #6: Error Handling — wrap all listeners in try/catch
@@ -142,12 +166,19 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
                 targetUserIds = [payload];
             }
 
-            targetUserIds.forEach((targetId) => {
+            for (const targetId of targetUserIds) {
+                const targetUser = await User.findById(targetId).select("blockedUsers blockedBy");
+                if (targetUser) {
+                    const isBlocked = 
+                        (targetUser.blockedUsers && targetUser.blockedUsers.some(id => id.toString() === userId)) ||
+                        (targetUser.blockedBy && targetUser.blockedBy.some(id => id.toString() === userId));
+                    if (isBlocked) continue;
+                }
                 const receiverSocketIds = getReceiverSocketIds(targetId);
                 receiverSocketIds.forEach((sid) => {
                     io.to(sid).emit(SOCKET_EVENTS.TYPING_START, convoId ? { convoId, userId } : userId);
                 });
-            });
+            }
         } catch (error) {
             console.error("❌ Typing event error:", error.message);
             socket.emit(SOCKET_EVENTS.ERROR, "Failed to send typing indicator");
@@ -175,12 +206,19 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
                 targetUserIds = [payload];
             }
 
-            targetUserIds.forEach((targetId) => {
+            for (const targetId of targetUserIds) {
+                const targetUser = await User.findById(targetId).select("blockedUsers blockedBy");
+                if (targetUser) {
+                    const isBlocked = 
+                        (targetUser.blockedUsers && targetUser.blockedUsers.some(id => id.toString() === userId)) ||
+                        (targetUser.blockedBy && targetUser.blockedBy.some(id => id.toString() === userId));
+                    if (isBlocked) continue;
+                }
                 const receiverSocketIds = getReceiverSocketIds(targetId);
                 receiverSocketIds.forEach((sid) => {
                     io.to(sid).emit(SOCKET_EVENTS.TYPING_STOP, convoId ? { convoId, userId } : userId);
                 });
-            });
+            }
         } catch (error) {
             console.error("❌ Stop typing event error:", error.message);
             socket.emit(SOCKET_EVENTS.ERROR, "Failed to send stop typing indicator");
@@ -239,8 +277,8 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
             // Clean up rate limit entry
             rateLimitMap.delete(socket.id);
 
-            // Broadcast updated online users
-            io.emit(SOCKET_EVENTS.USER_ONLINE, Object.keys(userSocketMap));
+            // Broadcast updated online users (filtered by blocks)
+            broadcastOnlineUsers().catch(err => console.error("Error broadcasting online users:", err));
         } catch (error) {
             console.error("❌ Disconnect handler error:", error.message);
         }

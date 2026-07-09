@@ -4,6 +4,7 @@ import { ChatLayout } from './pages/ChatLayout'
 import { Profile } from './pages/Profile'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
+import { LandingPage } from './pages/LandingPage'
 import useAuthStore from './store/authStore'
 import { Loader2 } from 'lucide-react'
 
@@ -22,7 +23,7 @@ function GuestRoute({ children }) {
 }
 
 export default function AppRoutes() {
-  const { checkAuth, isCheckingAuth } = useAuthStore();
+  const { checkAuth, isCheckingAuth, authUser } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
@@ -39,7 +40,7 @@ export default function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<ProtectedRoute><ChatLayout /></ProtectedRoute>} />
+      <Route path="/" element={authUser ? <ChatLayout /> : <LandingPage />} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
