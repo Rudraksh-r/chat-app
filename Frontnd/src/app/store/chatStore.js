@@ -239,7 +239,15 @@ const useChatStore = create((set, get) => ({
         return { ...message, decryptedText: plaintext };
       } catch (retryError) {
         console.error("Failed to decrypt 1:1 message after retry:", message._id, retryError.message);
-        return { ...message, decryptedText: "[Unable to decrypt]" };
+        
+        let fallbackText = "[Unable to decrypt]";
+        if (retryError.message.includes("missing from this device")) {
+          fallbackText = "[Message unavailable — private key missing]";
+        } else if (retryError.message.includes("decryption failed")) {
+          fallbackText = "[Message unavailable — key changed or device reset]";
+        }
+
+        return { ...message, decryptedText: fallbackText };
       }
     }
   },
