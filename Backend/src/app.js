@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
+import compression from "compression";
+import mongoose from "mongoose";
 import { app } from "./socket/socket.js";
 import { getCorsOrigins } from "./config/corsOrigins.js";
 import router from "./routes/auth.routes.js";
@@ -10,6 +12,9 @@ import messageRouter from "./routes/message.route.js";
 import userRouter from "./routes/user.route.js";
 import { ApiError } from "./utils/ApiError.js";
 import { errorNormalizer, globalErrorHandler } from "./middleware/error.middleware.js";
+
+// Trust proxy for rate limiters and secure cookies behind reverse proxies (Render, Railway, etc.)
+app.set('trust proxy', 1);
 
 // Helmet MUST be the first middleware
 app.use(helmet({
@@ -39,6 +44,9 @@ app.use(helmet({
     hidePoweredBy: true
 }));
 
+// Compress responses
+app.use(compression());
+
 // Security Note on CSRF:
 // Since cookies use sameSite: 'strict' (or 'lax') in a same-site topology, 
 // the primary defense against CSRF attacks is this strict CORS origin allowlist 
@@ -55,6 +63,20 @@ app.use(express.json({ limit: "16kb" }))
 app.use(express.urlencoded({ extended: true, limit: "16kb" }))
 app.use(express.static("public"))
 app.use(cookieParser())
+
+// Health checks
+app.get("/api/health", (req, res) => {
+    res.status(200).json({ status: "ok", uptime: process.uptime() });
+});
+
+app.get("/api/health/db", (req, res) => {
+    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    const isConnected = mongoose.connection.readyState === 1;
+    res.status(isConnected ? 200 : 503).json({
+        status: isConnected ? "ok" : "error",
+        readyState: mongoose.connection.readyState
+    });
+});
 
 app.use("/api/auth", router)
 app.use("/api/conversation", convoRouter)
