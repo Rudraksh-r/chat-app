@@ -5,17 +5,8 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/Token.js";
 
 const registerUser = asyncHandler(async (req, res) => {
-    const { fullName, username, email, password, publicKey = null } = req.body || {}
-
-    if (!fullName || !username || !email || !password) {
-        throw new ApiError(400, "All fields are required")
-    }
-
-    if (
-        [fullName, email, username, password].some((field) => field?.trim() === "")
-    ) {
-        throw new ApiError(400, "All fields are required");
-    }
+    // req.body is already validated by registerSchema
+    const { fullName, username, email, password, publicKey = null } = req.body;
 
     const existingUser = await User.findOne({ email })
 
@@ -64,11 +55,8 @@ const registerUser = asyncHandler(async (req, res) => {
 })
 
 const login = asyncHandler(async (req, res) => {
-    const { email, password } = req.body
-
-    if(!email || !password){
-        throw new ApiError(400, "All fields are required")
-    }
+    // req.body is already validated by loginSchema
+    const { email, password } = req.body;
 
     const user = await User.findOne({ email })
 
@@ -119,11 +107,8 @@ const getUser = asyncHandler(async (req, res) => {
         )
 })
 const changePassword = asyncHandler(async (req, res) => {
-    const { oldPassword, newPassword } = req.body || {}
-
-    if (!oldPassword || !newPassword) {
-        throw new ApiError(400, "Both old password and new password are required")
-    }
+    // req.body is already validated by changePasswordSchema
+    const { oldPassword, newPassword } = req.body;
 
     const user = await User.findById(req.user._id)
     if (!user) {

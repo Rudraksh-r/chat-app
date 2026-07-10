@@ -3,18 +3,19 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
+import { escapeRegex } from "../utils/escapeRegex.js";
 
 const searchUsers = asyncHandler(async (req, res) => {
-  const keyword = req.query.search;
-  if (!keyword) throw new ApiError(400, "Keyword is required");
+  // req.query.search is already validated (non-empty, max 100 chars) by searchQuerySchema
+  const safeKeyword = escapeRegex(req.query.search);
 
   const users = await User.find({
     $and: [
       {
         $or: [
-          { fullName: { $regex: keyword, $options: "i" } },
-          { username: { $regex: keyword, $options: "i" } },
-          { email: { $regex: keyword, $options: "i" } },
+          { fullName: { $regex: safeKeyword, $options: "i" } },
+          { username: { $regex: safeKeyword, $options: "i" } },
+          { email: { $regex: safeKeyword, $options: "i" } },
         ],
       },
       { _id: { $ne: req.user._id } },
@@ -78,23 +79,8 @@ const updateAvatar = asyncHandler(async (req, res) => {
 // Backend/src/controllers/user.controller.js — add this function
 
 const updatePublicKey = asyncHandler(async (req, res) => {
-  const { publicKey } = req.body;
-
-  if (!publicKey) {
-    throw new ApiError(400, 'Public key is required');
-  }
-
-  // Basic validation — browser-generated ECDH public keys are base64-encoded
-  // and are typically shorter than 100 chars, so we accept any non-empty,
-  // base64-like string rather than enforcing an overly large minimum length.
-  const normalizedPublicKey = publicKey.trim();
-  if (
-    typeof normalizedPublicKey !== 'string' ||
-    normalizedPublicKey.length < 20 ||
-    !/^[A-Za-z0-9+/=]+$/.test(normalizedPublicKey)
-  ) {
-    throw new ApiError(400, 'Invalid public key format');
-  }
+  // req.body.publicKey is already validated (trimmed, min 20, base64) by updatePublicKeySchema
+  const { publicKey: normalizedPublicKey } = req.body;
 
   const user = await User.findByIdAndUpdate(
     req.user._id,
@@ -108,11 +94,8 @@ const updatePublicKey = asyncHandler(async (req, res) => {
 });
 
 const getUserPublicKey = asyncHandler(async (req, res) => {
+  // req.params.userId is already validated as a valid ObjectId by userIdParamSchema
   const { userId } = req.params;
-
-  if (!userId || userId.length !== 24) {
-    throw new ApiError(400, "Invalid user ID format");
-  }
 
   const user = await User.findById(userId).select("publicKey fullName");
 
@@ -153,11 +136,8 @@ const validateUrl = (urlStr) => {
 };
 
 const getUserProfile = asyncHandler(async (req, res) => {
+  // req.params.id is already validated as a valid ObjectId by idParamSchema
   const { id } = req.params;
-  
-  if (!id || id.length !== 24) {
-    throw new ApiError(400, "Invalid user ID format");
-  }
 
   const user = await User.findById(id).select("-password -refreshToken");
   if (!user) {
@@ -218,12 +198,9 @@ const updateProfileDetails = asyncHandler(async (req, res) => {
 });
 
 const blockUser = asyncHandler(async (req, res) => {
+  // req.params.id is already validated as a valid ObjectId by idParamSchema
   const { id } = req.params;
   const userId = req.user._id;
-
-  if (!id || id.length !== 24) {
-    throw new ApiError(400, "Invalid user ID format");
-  }
 
   if (id === userId.toString()) {
     throw new ApiError(400, "You cannot block yourself");
@@ -251,12 +228,9 @@ const blockUser = asyncHandler(async (req, res) => {
 });
 
 const unblockUser = asyncHandler(async (req, res) => {
+  // req.params.id is already validated as a valid ObjectId by idParamSchema
   const { id } = req.params;
   const userId = req.user._id;
-
-  if (!id || id.length !== 24) {
-    throw new ApiError(400, "Invalid user ID format");
-  }
 
   const targetUser = await User.findById(id);
   if (!targetUser) {

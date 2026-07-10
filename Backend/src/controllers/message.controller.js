@@ -9,6 +9,7 @@ import { SOCKET_EVENTS } from "../socket/events.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 
 const sendMessage = asyncHandler(async (req, res) => {
+  // req.body is already validated by sendMessageSchema (convoId, type, ciphertext, iv, counter, keyVersion, etc.)
   const {
     convoId,
     type = "text",
@@ -20,10 +21,6 @@ const sendMessage = asyncHandler(async (req, res) => {
     replyTo,
   } = req.body;
   const senderId = req.user._id;
-
-  if (!convoId) {
-    throw new ApiError(400, "convoId is required");
-  }
 
   const convoExists = await Conversation.findById(convoId);
   if (!convoExists) {
@@ -418,16 +415,7 @@ const toggleReaction = asyncHandler(async (req, res) => {
   }
   reactionRateLimits.set(userId.toString(), now);
 
-  // Validate Emoji Payload (Regex to match standard emojis & length check)
-  const emojiRegex = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/u;
-  if (
-    !emoji ||
-    emoji.trim().length === 0 ||
-    emoji.length > 10 ||
-    !emojiRegex.test(emoji)
-  ) {
-    throw new ApiError(400, "Invalid emoji character payload");
-  }
+  // Emoji validation (format, length, regex) is now handled by reactSchema in middleware
 
   const message = await Message.findById(messageId);
   if (!message) {

@@ -18,12 +18,9 @@ const emitGroupEvent = (members, event, payload) => {
 };
 
 const createConvo = asyncHandler(async (req, res) => {
+  // req.body is already validated by createConvoSchema (receiverId is a valid ObjectId)
   const { receiverId } = req.body;
   const senderId = req.user._id;
-
-  if (!receiverId) {
-    throw new ApiError(400, "Receiver ID is required");
-  }
 
   if (senderId.toString() === receiverId.toString()) {
     throw new ApiError(400, "You cannot create a conversation with yourself");
@@ -64,19 +61,9 @@ const createConvo = asyncHandler(async (req, res) => {
 
 // 1. Instantiates a production-ready group context
 const createGroupChat = asyncHandler(async (req, res) => {
+  // req.body is already validated by createGroupSchema (name 1-100, memberIds array of ObjectIds, min 1)
   const { name, memberIds } = req.body;
   const creatorId = req.user._id;
-
-  if (!name || !memberIds || !Array.isArray(memberIds)) {
-    throw new ApiError(
-      400,
-      "Group name and an array of valid member IDs are mandatory fields",
-    );
-  }
-
-  if (memberIds.length < 1) {
-    throw new ApiError(400, "A group requires at least one other member");
-  }
 
   // Deduplicate members list and ensure creator is explicitly present
   const uniqueMembers = [...new Set([...memberIds, creatorId.toString()])];
@@ -112,12 +99,9 @@ const createGroupChat = asyncHandler(async (req, res) => {
 
 // 2. Add members securely
 const addGroupMembers = asyncHandler(async (req, res) => {
+  // req.body is already validated by addMembersSchema (newUserIds array of ObjectIds, min 1)
   const { newUserIds } = req.body;
   const conversation = req.conversation; // Provided cleanly by verifyGroupAdmin middleware
-
-  if (!newUserIds || !Array.isArray(newUserIds)) {
-    throw new ApiError(400, "Target User IDs array is missing");
-  }
 
   // Use $addToSet to prevent duplicate item entries inside the array safely
   const updatedGroup = await Conversation.findByIdAndUpdate(
