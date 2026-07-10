@@ -75,7 +75,7 @@ io.use(async (socket, next) => {
             return next(new Error("Authentication error: No token provided"));
         }
 
-        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, { algorithms: ["HS256"] });
         const user = await User.findById(decoded._id).select("-password -refreshToken");
 
         if (!user) {
