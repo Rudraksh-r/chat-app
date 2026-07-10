@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
+import logger from "./logger.js";
 
 // Configure once, here, using env vars
 cloudinary.config({
@@ -27,20 +28,20 @@ export const uploadToCloudinary = (fileBuffer, options = {}) => {
       ...options,
     };
 
-    console.log("☁️  Starting Cloudinary upload...");
-    console.log("   cloud_name:", process.env.CLOUDINARY_CLOUD_NAME ? "✅ set" : "❌ MISSING");
-    console.log("   api_key:", process.env.CLOUDINARY_API_KEY ? "✅ set" : "❌ MISSING");
-    console.log("   api_secret:", process.env.CLOUDINARY_API_SECRET ? "✅ set" : "❌ MISSING");
+    logger.info("☁️  Starting Cloudinary upload...");
+    logger.info("   cloud_name: %s", process.env.CLOUDINARY_CLOUD_NAME ? "✅ set" : "❌ MISSING");
+    logger.info("   api_key: %s", process.env.CLOUDINARY_API_KEY ? "✅ set" : "❌ MISSING");
+    logger.info("   api_secret: %s", process.env.CLOUDINARY_API_SECRET ? "✅ set" : "❌ MISSING");
 
     const uploadStream = cloudinary.uploader.upload_stream(
       uploadOptions,
       (error, result) => {
         if (error) {
-          console.error("❌ Cloudinary upload failed:", error.message);
-          console.error("   HTTP status:", error.http_code);
+          logger.error("❌ Cloudinary upload failed: %s", error.message);
+          logger.error("   HTTP status: %s", error.http_code);
           return reject(error);
         }
-        console.log("✅ Cloudinary upload success:", result.secure_url);
+        logger.info("✅ Cloudinary upload success: %s", result.secure_url);
         resolve(result);
       }
     );

@@ -6,6 +6,7 @@ import { User } from "../models/user.model.js";
 import { Message } from "../models/message.model.js";
 import { Conversation } from "../models/conversation.model.js";
 import { SOCKET_EVENTS } from "./events.js";
+import logger from "../utils/logger.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -87,7 +88,7 @@ io.use(async (socket, next) => {
         socket.user = user;
         next();
     } catch (error) {
-        console.error("🔒 Socket auth failed:", error.message);
+        logger.error("🔒 Socket auth failed: %s", error.stack || error.message || error);
         next(new Error("Authentication error: Invalid token"));
     }
 });
@@ -119,7 +120,7 @@ export const broadcastOnlineUsers = async () => {
             });
         }
     } catch (error) {
-        console.error("❌ broadcastOnlineUsers error:", error.message);
+        logger.error("❌ broadcastOnlineUsers error: %s", error.stack || error.message || error);
     }
 };
 
@@ -128,7 +129,7 @@ export const broadcastOnlineUsers = async () => {
 // ─────────────────────────────────────────────────────────
 io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
     const userId = socket.userId;
-    console.log(`🟢 User connected: ${socket.user.fullName || userId} (${socket.id})`);
+    logger.info(`🟢 User connected: ${socket.user.fullName || userId} (${socket.id})`);
 
     // Phase 2.5 #5: Add this socket to the user's set (multi-tab support)
     if (!userSocketMap[userId]) {
@@ -137,7 +138,7 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
     userSocketMap[userId].add(socket.id);
 
     // Broadcast updated online users list (filtered by blocks)
-    broadcastOnlineUsers().catch(err => console.error("Error broadcasting online users:", err));
+    broadcastOnlineUsers().catch(err => logger.error("Error broadcasting online users: %s", err.stack || err.message || err));
 
     // ─────────────────────────────────────────────────────
     // Phase 2.5 #6: Error Handling — wrap all listeners in try/catch
@@ -180,7 +181,7 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
                 });
             }
         } catch (error) {
-            console.error("❌ Typing event error:", error.message);
+            logger.error("❌ Typing event error: %s", error.stack || error.message || error);
             socket.emit(SOCKET_EVENTS.ERROR, "Failed to send typing indicator");
         }
     });
@@ -220,7 +221,7 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
                 });
             }
         } catch (error) {
-            console.error("❌ Stop typing event error:", error.message);
+            logger.error("❌ Stop typing event error: %s", error.stack || error.message || error);
             socket.emit(SOCKET_EVENTS.ERROR, "Failed to send stop typing indicator");
         }
     });
@@ -230,7 +231,7 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
         try {
             await Message.findByIdAndUpdate(messageId, { status: "delivered" });
         } catch (error) {
-            console.error("❌ Delivery status update error:", error.message);
+            logger.error("❌ Delivery status update error: %s", error.stack || error.message || error);
         }
     });
 
@@ -249,7 +250,7 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
                 io.to(sid).emit(SOCKET_EVENTS.MESSAGE_SEEN, { convoId, seenBy: userId });
             });
         } catch (error) {
-            console.error("❌ Seen receipt error:", error.message);
+            logger.error("❌ Seen receipt error: %s", error.stack || error.message || error);
             socket.emit(SOCKET_EVENTS.ERROR, "Failed to update read receipts");
         }
     });
@@ -258,7 +259,7 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
     // Phase 2.5 #2 & #7: Clean Disconnect + Last Seen
     // ─────────────────────────────────────────────────────
     socket.on(SOCKET_EVENTS.DISCONNECT, async () => {
-        console.log(`🔴 User disconnected: ${socket.user.fullName || userId} (${socket.id})`);
+        logger.info(`🔴 User disconnected: ${socket.user.fullName || userId} (${socket.id})`);
 
         try {
             // Remove THIS specific socket from the user's set
@@ -278,9 +279,9 @@ io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
             rateLimitMap.delete(socket.id);
 
             // Broadcast updated online users (filtered by blocks)
-            broadcastOnlineUsers().catch(err => console.error("Error broadcasting online users:", err));
+            broadcastOnlineUsers().catch(err => logger.error("Error broadcasting online users: %s", err.stack || err.message || err));
         } catch (error) {
-            console.error("❌ Disconnect handler error:", error.message);
+            logger.error("❌ Disconnect handler error: %s", error.stack || error.message || error);
         }
     });
 });

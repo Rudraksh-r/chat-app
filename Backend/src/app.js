@@ -6,6 +6,8 @@ import router from "./routes/auth.routes.js";
 import convoRouter from "./routes/converssation.route.js";
 import messageRouter from "./routes/message.route.js";
 import userRouter from "./routes/user.route.js";
+import { ApiError } from "./utils/ApiError.js";
+import { errorNormalizer, globalErrorHandler } from "./middleware/error.middleware.js";
 
 app.use(cors({
     origin: [process.env.CORS_ORIGIN, "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
@@ -22,17 +24,15 @@ app.use("/api/conversation", convoRouter)
 app.use("/api/message", messageRouter)
 app.use("/api/user", userRouter)
 
-// Global error handler
-app.use((err, req, res, next) => {
-    const statusCode = err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    return res.status(statusCode).json({
-        success: false,
-        statusCode,
-        message,
-        errors: err.errors || [],
-    });
+// Catch-all for unmatched routes
+app.use((req, res, next) => {
+    next(new ApiError(404, "Not found"));
 });
+
+// Error normalization middleware
+app.use(errorNormalizer);
+
+// Global error handler
+app.use(globalErrorHandler);
 
 export default app;

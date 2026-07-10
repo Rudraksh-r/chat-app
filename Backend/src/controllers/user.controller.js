@@ -1,5 +1,6 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import logger from "../utils/logger.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
@@ -47,8 +48,8 @@ const updateProfile = asyncHandler(async (req, res) => {
 
 const updateAvatar = asyncHandler(async (req, res) => {
   // req.file comes from multer — it has .buffer (the file bytes) and .mimetype
-  console.log("📸 Avatar upload request received");
-  console.log("   req.file:", req.file ? `${req.file.originalname} (${req.file.size} bytes)` : "❌ MISSING");
+  logger.info("📸 Avatar upload request received");
+  logger.info("   req.file: %s", req.file ? `${req.file.originalname} (${req.file.size} bytes)` : "❌ MISSING");
 
   if (!req.file) {
     throw new ApiError(400, "Avatar image is required");

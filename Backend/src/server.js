@@ -2,6 +2,7 @@ import "dotenv/config"; // This MUST be the first import to load .env variables 
 import connectDB from "./config/db.js";
 import "./app.js"; // This MUST be imported so the routes attach to the app instance!
 import { server } from "./socket/socket.js";
+import logger from "./utils/logger.js";
 
 const listen = async (params) => {
     try {
@@ -9,10 +10,10 @@ const listen = async (params) => {
 
         const port = process.env.PORT || 5001;
         server.listen(port, () => {
-            console.log(`Server is running on port ${port}`);
+            logger.info(`Server is running on port ${port}`);
         })
     } catch (error) {
-        console.log("Error in connecting to the database", error);
+        logger.error("Error in connecting to the database: %s", error.stack || error.message || error);
     }
 }
 
