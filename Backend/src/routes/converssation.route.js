@@ -11,6 +11,7 @@ import {
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { verifyGroupAdmin, } from "../middleware/groupAuth.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
+import { moderateLimiter } from "../middleware/rateLimiter.middleware.js";
 import {
     createConvoSchema,
     createGroupSchema,
@@ -22,14 +23,14 @@ import {
 } from "../validators/conversationSchemas.js";
 
 const router = express.Router()
-router.post("/", verifyJWT, validate(createConvoSchema), createConvo)
-router.post("/group", verifyJWT, validate(createGroupSchema), createGroupChat)
+router.post("/", verifyJWT, moderateLimiter, validate(createConvoSchema), createConvo)
+router.post("/group", verifyJWT, moderateLimiter, validate(createGroupSchema), createGroupChat)
 router.get("/", verifyJWT, getAllConvo)
 
 // Target-Specific Protected Operations via RBAC Middleware Chain
-router.patch('/:chatId/add', verifyJWT, validate(chatIdParamSchema, "params"), validate(addMembersSchema), verifyGroupAdmin, addGroupMembers);
-router.patch('/:chatId/remove', verifyJWT, validate(chatIdParamSchema, "params"), validate(removeMemberSchema), verifyGroupAdmin, removeGroupMember);
-router.patch('/:chatId/promote', verifyJWT, validate(chatIdParamSchema, "params"), validate(promoteMemberSchema), verifyGroupAdmin, promoteToAdmin);
-router.patch('/:chatId/metadata', verifyJWT, validate(chatIdParamSchema, "params"), validate(updateMetadataSchema), verifyGroupAdmin, updateGroupMetadata);
+router.patch('/:chatId/add', verifyJWT, moderateLimiter, validate(chatIdParamSchema, "params"), validate(addMembersSchema), verifyGroupAdmin, addGroupMembers);
+router.patch('/:chatId/remove', verifyJWT, moderateLimiter, validate(chatIdParamSchema, "params"), validate(removeMemberSchema), verifyGroupAdmin, removeGroupMember);
+router.patch('/:chatId/promote', verifyJWT, moderateLimiter, validate(chatIdParamSchema, "params"), validate(promoteMemberSchema), verifyGroupAdmin, promoteToAdmin);
+router.patch('/:chatId/metadata', verifyJWT, moderateLimiter, validate(chatIdParamSchema, "params"), validate(updateMetadataSchema), verifyGroupAdmin, updateGroupMetadata);
 
 export default router

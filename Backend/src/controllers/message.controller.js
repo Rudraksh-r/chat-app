@@ -388,7 +388,9 @@ const editMessage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, message, "Message edited successfully"));
 });
 
-// Rate limiting map for reactions
+// Rate limiting map for reactions.
+// WARNING: Using in-memory Map-based limiting. Only works correctly on a single server instance.
+// For production horizontal scaling, this should be moved to Redis (e.g., using rate-limiter-flexible with RedisStore).
 const reactionRateLimits = new Map();
 
 // Periodic cleanup for rate limit map to prevent memory leaks
@@ -407,10 +409,11 @@ const toggleReaction = asyncHandler(async (req, res) => {
   const { emoji } = req.body;
   const userId = req.user._id;
 
-  // Rate Limiting Debouncer (500ms lock)
+  // Rate Limiting Debouncer (configurable lock)
   const now = Date.now();
   const lastReaction = reactionRateLimits.get(userId.toString());
-  if (lastReaction && now - lastReaction < 500) {
+  const cooldownWindowMs = parseInt(process.env.RATE_LIMIT_REACTION_WINDOW_MS) || 500;
+  if (lastReaction && now - lastReaction < cooldownWindowMs) {
     throw new ApiError(429, "Too many reaction requests. Please slow down.");
   }
   reactionRateLimits.set(userId.toString(), now);

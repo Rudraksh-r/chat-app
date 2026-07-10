@@ -3,6 +3,7 @@ import { registerUser, login, getUser, changePassword } from "../controllers/aut
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
+import { authLimiter } from "../middleware/rateLimiter.middleware.js";
 import {
   registerSchema,
   loginSchema,
@@ -11,8 +12,8 @@ import {
 
 const router = express.Router()
 
-router.post("/register", upload.none(), validate(registerSchema), registerUser)
-router.post("/login", validate(loginSchema), login)
+router.post("/register", authLimiter, upload.none(), validate(registerSchema), registerUser)
+router.post("/login", authLimiter, validate(loginSchema), login)
 router.get("/get-user", verifyJWT, getUser)
 router.put("/change-password", verifyJWT, validate(changePasswordSchema), changePassword)
 

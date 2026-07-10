@@ -14,6 +14,7 @@ import {
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
+import { moderateLimiter } from "../middleware/rateLimiter.middleware.js";
 import {
   searchQuerySchema,
   updatePublicKeySchema,
@@ -25,7 +26,7 @@ import {
 
 const router = express.Router();
 
-router.get("/search", verifyJWT, validate(searchQuerySchema, "query"), searchUsers);
+router.get("/search", verifyJWT, moderateLimiter, validate(searchQuerySchema, "query"), searchUsers);
 router.get("/public-key/:userId", verifyJWT, validate(userIdParamSchema, "params"), getUserPublicKey);
 router.put("/profile", verifyJWT, validate(updateProfileSchema), updateProfile);
 router.put("/public-key", verifyJWT, validate(updatePublicKeySchema), updatePublicKey);

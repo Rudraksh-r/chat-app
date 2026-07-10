@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import http from "http";
 import express from "express";
 import jwt from "jsonwebtoken";
+import { RateLimiterMemory } from "rate-limiter-flexible";
 import { User } from "../models/user.model.js";
 import { Message } from "../models/message.model.js";
 import { Conversation } from "../models/conversation.model.js";
@@ -40,24 +41,47 @@ export const getReceiverSocketId = (receiverId) => {
 // Limit messages per second per socket to prevent spam
 // ─────────────────────────────────────────────────────────
 const rateLimitMap = new Map(); // socketId -> { count, lastReset }
-const RATE_LIMIT = 5;          // max events per window
-const RATE_WINDOW_MS = 1000;   // 1 second window
 
+// WARNING: Using in-memory Map-based limiting. Only works correctly on a single server instance.
+// For production horizontal scaling, this must be moved to Redis (e.g., using rate-limiter-flexible with RedisStore).
 function isRateLimited(socketId) {
     const now = Date.now();
     let entry = rateLimitMap.get(socketId);
+    const rateLimitMax = parseInt(process.env.RATE_LIMIT_TYPING_MAX) || 5;
+    const rateWindowMs = parseInt(process.env.RATE_LIMIT_TYPING_WINDOW_MS) || 1000;
 
-    if (!entry || now - entry.lastReset > RATE_WINDOW_MS) {
+    if (!entry || now - entry.lastReset > rateWindowMs) {
         entry = { count: 1, lastReset: now };
         rateLimitMap.set(socketId, entry);
         return false;
     }
 
     entry.count++;
-    if (entry.count > RATE_LIMIT) {
+    if (entry.count > rateLimitMax) {
         return true;
     }
     return false;
+}
+
+// ─────────────────────────────────────────────────────────
+// Socket Connection Authentication Rate Limiter
+// ─────────────────────────────────────────────────────────
+// WARNING: Using in-memory store (RateLimiterMemory). This only works correctly
+// on a single server instance. Move to RedisStore (RateLimiterRedis) before horizontal scaling.
+const socketAuthLimiter = new RateLimiterMemory({
+    keyPrefix: "socket_auth_fail",
+    points: parseInt(process.env.RATE_LIMIT_SOCKET_AUTH_MAX) || 10,
+    duration: (parseInt(process.env.RATE_LIMIT_SOCKET_AUTH_WINDOW_MS) || 60000) / 1000,
+    blockDuration: (parseInt(process.env.RATE_LIMIT_SOCKET_AUTH_BLOCK_MS) || 300000) / 1000,
+});
+
+// Helper to handle authentication failure rate limit point consumption
+async function handleSocketAuthFailure(ip) {
+    try {
+        await socketAuthLimiter.consume(ip);
+    } catch (rejRes) {
+        logger.warn(`🔒 Socket auth rate limit exceeded for IP: ${ip}. Blocked for ${Math.ceil(rejRes.msBeforeNext / 1000)}s.`);
+    }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -65,7 +89,17 @@ function isRateLimited(socketId) {
 // Verify JWT before allowing connection
 // ─────────────────────────────────────────────────────────
 io.use(async (socket, next) => {
+    const ip = socket.handshake.address || socket.handshake.headers["x-forwarded-for"] || "unknown";
+
     try {
+        // Pre-check if client IP is currently blocked
+        const blockRes = await socketAuthLimiter.get(ip);
+        if (blockRes && blockRes.remainingPoints <= 0) {
+            const retryAfter = Math.ceil(blockRes.msBeforeNext / 1000);
+            logger.warn(`🔒 Socket connection blocked for IP ${ip}. Try again in ${retryAfter}s.`);
+            return next(new Error(`Too many failed authentication attempts. Please try again in ${retryAfter} seconds.`));
+        }
+
         // Accept token from auth object, query param, or cookie header
         const token =
             socket.handshake.auth?.token ||
@@ -73,6 +107,7 @@ io.use(async (socket, next) => {
             parseCookieToken(socket.handshake.headers?.cookie);
 
         if (!token) {
+            await handleSocketAuthFailure(ip);
             return next(new Error("Authentication error: No token provided"));
         }
 
@@ -80,8 +115,14 @@ io.use(async (socket, next) => {
         const user = await User.findById(decoded._id).select("-password -refreshToken");
 
         if (!user) {
+            await handleSocketAuthFailure(ip);
             return next(new Error("Authentication error: User not found"));
         }
+
+        // Clear socket auth failures for this IP upon successful connection
+        await socketAuthLimiter.delete(ip).catch((err) => {
+            logger.error("Failed to reset socket auth limiter count: %s", err.stack || err.message || err);
+        });
 
         // Attach user to socket for use in event handlers
         socket.userId = user._id.toString();
@@ -89,6 +130,7 @@ io.use(async (socket, next) => {
         next();
     } catch (error) {
         logger.error("🔒 Socket auth failed: %s", error.stack || error.message || error);
+        await handleSocketAuthFailure(ip);
         next(new Error("Authentication error: Invalid token"));
     }
 });

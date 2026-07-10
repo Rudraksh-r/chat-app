@@ -3,6 +3,7 @@ import { sendMessage, getMessage, deleteMessage, deleteForEveryone, editMessage,
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
+import { looseLimiter } from "../middleware/rateLimiter.middleware.js";
 import {
   sendMessageSchema,
   convoIdParamSchema,
@@ -13,11 +14,11 @@ import {
 
 const router = express.Router();
 
-router.post("/send", verifyJWT, upload.single("file"), validate(sendMessageSchema), sendMessage)
-router.get("/:convoId", verifyJWT, validate(convoIdParamSchema, "params"), getMessage)
-router.patch("/:id/delete", verifyJWT, validate(messageIdParamSchema, "params"), deleteMessage);
-router.patch("/:id/delete-for-everyone", verifyJWT, validate(messageIdParamSchema, "params"), deleteForEveryone);
-router.patch("/:id/edit", verifyJWT, validate(messageIdParamSchema, "params"), validate(editMessageSchema), editMessage)
-router.post("/:id/react", verifyJWT, validate(messageIdParamSchema, "params"), validate(reactSchema), toggleReaction);
+router.post("/send", verifyJWT, looseLimiter, upload.single("file"), validate(sendMessageSchema), sendMessage)
+router.get("/:convoId", verifyJWT, looseLimiter, validate(convoIdParamSchema, "params"), getMessage)
+router.patch("/:id/delete", verifyJWT, looseLimiter, validate(messageIdParamSchema, "params"), deleteMessage);
+router.patch("/:id/delete-for-everyone", verifyJWT, looseLimiter, validate(messageIdParamSchema, "params"), deleteForEveryone);
+router.patch("/:id/edit", verifyJWT, looseLimiter, validate(messageIdParamSchema, "params"), validate(editMessageSchema), editMessage)
+router.post("/:id/react", verifyJWT, looseLimiter, validate(messageIdParamSchema, "params"), validate(reactSchema), toggleReaction);
 
 export default router
