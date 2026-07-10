@@ -25,7 +25,10 @@ export function validate(schema, source = "body") {
     }
 
     // Replace the source with parsed data so downstream code trusts it
-    req[source] = result.data;
+    // Mutate in-place since req.query has only a getter in Express
+    Object.keys(req[source]).forEach((key) => delete req[source][key]);
+    Object.assign(req[source], result.data);
+    
     next();
   };
 }

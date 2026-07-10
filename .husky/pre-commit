@@ -1,0 +1,83 @@
+#!/usr/bin/env sh
+
+# Pre-commit hook: block commits that contain secrets
+# Uses gitleaks if installed, otherwise falls back to regex pattern matching
+
+# ── Gitleaks (preferred) ──────────────────────────────────────────────
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --verbose
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ gitleaks detected secrets in staged files. Commit blocked."
+    echo "   If this is a false positive, use: git commit --no-verify"
+    exit 1
+  fi
+  exit 0
+fi
+
+# ── Fallback: regex-based secret detection ────────────────────────────
+echo "⚠️  gitleaks not found — running fallback regex scan on staged files..."
+echo "   Install gitleaks for better detection: https://github.com/gitleaks/gitleaks#installing"
+echo ""
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED_FILES" ]; then
+  exit 0
+fi
+
+FOUND=0
+
+for FILE in $STAGED_FILES; do
+  # Skip binary files and .env.example files
+  case "$FILE" in
+    *.env.example) continue ;;
+    *.png|*.jpg|*.jpeg|*.gif|*.ico|*.woff|*.woff2|*.ttf|*.eot) continue ;;
+  esac
+
+  # Check for .env files (should never be committed)
+  case "$FILE" in
+    *.env|*.env.local|*.env.development|*.env.production|*.env.test|*.env.*.local)
+      echo "🔴 BLOCKED: $FILE — .env files must not be committed"
+      FOUND=1
+      continue
+      ;;
+  esac
+
+  # Check file contents for secret patterns
+  CONTENT=$(git show ":$FILE" 2>/dev/null) || continue
+
+  # MongoDB connection strings with credentials
+  if echo "$CONTENT" | grep -qE 'mongodb\+srv://[^:]+:[^@]+@'; then
+    echo "🔴 BLOCKED: $FILE — contains MongoDB connection string with credentials"
+    FOUND=1
+  fi
+
+  # AWS access key IDs
+  if echo "$CONTENT" | grep -qE 'AKIA[0-9A-Z]{16}'; then
+    echo "🔴 BLOCKED: $FILE — contains AWS access key"
+    FOUND=1
+  fi
+
+  # High-entropy strings assigned to secret/key/token/password variables
+  if echo "$CONTENT" | grep -qE '(SECRET|KEY|TOKEN|PASSWORD)\s*=\s*['\''"][A-Za-z0-9+/=_-]{20,}['\''"]'; then
+    echo "🔴 BLOCKED: $FILE — contains potential hardcoded secret"
+    FOUND=1
+  fi
+
+  # Cloudinary URLs with api_secret
+  if echo "$CONTENT" | grep -qE 'cloudinary://[0-9]+:[A-Za-z0-9_-]+@'; then
+    echo "🔴 BLOCKED: $FILE — contains Cloudinary URL with embedded secret"
+    FOUND=1
+  fi
+done
+
+if [ $FOUND -ne 0 ]; then
+  echo ""
+  echo "❌ Potential secrets detected in staged files. Commit blocked."
+  echo "   If this is a false positive, use: git commit --no-verify"
+  exit 1
+fi
+
+echo "✅ No secrets detected in staged files."
+exit 0

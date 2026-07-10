@@ -28,7 +28,7 @@ export const uploadToCloudinary = (fileBuffer, options = {}) => {
     };
 
     console.log("☁️  Starting Cloudinary upload...");
-    console.log("   cloud_name:", process.env.CLOUDINARY_CLOUD_NAME);
+    console.log("   cloud_name:", process.env.CLOUDINARY_CLOUD_NAME ? "✅ set" : "❌ MISSING");
     console.log("   api_key:", process.env.CLOUDINARY_API_KEY ? "✅ set" : "❌ MISSING");
     console.log("   api_secret:", process.env.CLOUDINARY_API_SECRET ? "✅ set" : "❌ MISSING");
 
