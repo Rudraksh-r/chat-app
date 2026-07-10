@@ -8,12 +8,13 @@ import { Message } from "../models/message.model.js";
 import { Conversation } from "../models/conversation.model.js";
 import { SOCKET_EVENTS } from "./events.js";
 import logger from "../utils/logger.js";
+import { getCorsOrigins } from "../config/corsOrigins.js";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: [process.env.CORS_ORIGIN, "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+        origin: getCorsOrigins(),
         methods: ["GET", "POST"],
         credentials: true,
     },

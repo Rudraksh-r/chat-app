@@ -1,7 +1,9 @@
 import express from "express";
-import cors from "cors"
-import cookieParser from "cookie-parser"
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
 import { app } from "./socket/socket.js";
+import { getCorsOrigins } from "./config/corsOrigins.js";
 import router from "./routes/auth.routes.js";
 import convoRouter from "./routes/converssation.route.js";
 import messageRouter from "./routes/message.route.js";
@@ -9,8 +11,36 @@ import userRouter from "./routes/user.route.js";
 import { ApiError } from "./utils/ApiError.js";
 import { errorNormalizer, globalErrorHandler } from "./middleware/error.middleware.js";
 
+// Helmet MUST be the first middleware
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "https://fonts.googleapis.com", "'unsafe-inline'"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "https://ui-avatars.com"],
+            mediaSrc: ["'self'", "https://res.cloudinary.com"],
+            connectSrc: ["'self'", "http://localhost:5001", "ws://localhost:5001", "https://your-api-domain", "wss://your-api-domain"],
+            frameAncestors: ["'none'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+        }
+    },
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+    },
+    noSniff: true,
+    frameguard: {
+        action: "deny"
+    },
+    hidePoweredBy: true
+}));
+
 app.use(cors({
-    origin: [process.env.CORS_ORIGIN, "http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+    origin: getCorsOrigins(),
     credentials: true
 }))
 
