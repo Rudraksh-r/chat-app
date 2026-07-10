@@ -27,6 +27,13 @@ export default function AppRoutes() {
 
   useEffect(() => {
     checkAuth();
+
+    const handleUnauthorized = () => {
+      useAuthStore.getState().logout();
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, [checkAuth]);
 
   // Show a loading spinner while we verify the session cookie with the backend

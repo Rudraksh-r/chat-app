@@ -39,6 +39,13 @@ app.use(helmet({
     hidePoweredBy: true
 }));
 
+// Security Note on CSRF:
+// Since cookies use sameSite: 'strict' (or 'lax') in a same-site topology, 
+// the primary defense against CSRF attacks is this strict CORS origin allowlist 
+// combined with the cookie attributes. 
+// A malicious third-party site's cross-origin fetch with credentials will be 
+// blocked by CORS. If you ever add non-JSON endpoints (e.g., HTML form POSTs) 
+// or widen CORS with wildcards, you MUST add separate CSRF token middleware.
 app.use(cors({
     origin: getCorsOrigins(),
     credentials: true
