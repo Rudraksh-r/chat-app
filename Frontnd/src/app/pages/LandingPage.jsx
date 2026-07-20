@@ -295,11 +295,9 @@ export function LandingPage() {
         style={{ background: "rgba(0,0,0,0)", borderBottom: "1px solid rgba(0,0,0,0)" }}
       >
         <div className="flex items-center gap-2">
-          <div
-            className="w-9 h-9 rounded-2xl flex items-center justify-center"
-            style={{ background: "#007AFF" }}
-          >
-            <MessageCircle size={18} strokeWidth={2} color="#fff" />
+          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full ring-1 ring-border/50">
+            <img src="/logo-light.png" alt="Cipher" className="h-full w-full object-cover dark:hidden" />
+            <img src="/logo-dark.png" alt="Cipher" className="hidden h-full w-full object-cover dark:block" />
           </div>
           <span style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)" }}>Cipher</span>
         </div>
@@ -840,11 +838,9 @@ export function LandingPage() {
       <footer className="hairline px-6 py-10">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div
-              className="w-7 h-7 rounded-xl flex items-center justify-center"
-              style={{ background: "#007AFF" }}
-            >
-              <MessageCircle size={14} strokeWidth={2} color="#fff" />
+            <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ring-1 ring-border/50">
+              <img src="/logo-light.png" alt="Cipher" className="h-full w-full object-cover dark:hidden" />
+              <img src="/logo-dark.png" alt="Cipher" className="hidden h-full w-full object-cover dark:block" />
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: "var(--foreground)" }}>Cipher</span>
           </div>

@@ -29,6 +29,10 @@ export function Signup() {
         className="w-full max-w-[420px] rounded-[28px] bg-card px-5 py-6 shadow-[0_18px_50px_rgba(0,0,0,0.08)] sm:px-6"
       >
         <div className="mb-7 text-center">
+          <div className="mx-auto mb-5 flex size-24 items-center justify-center overflow-hidden rounded-full ring-1 ring-border/50">
+            <img src="/logo-light.png" alt="Cipher" className="h-full w-full object-cover dark:hidden" />
+            <img src="/logo-dark.png" alt="Cipher" className="hidden h-full w-full object-cover dark:block" />
+          </div>
           <h1 className="text-[28px] font-bold leading-[34px] text-foreground">
             Create Account
           </h1>
