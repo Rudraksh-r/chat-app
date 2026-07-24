@@ -8,7 +8,7 @@ export const Button = React.forwardRef(({ className, variant = 'primary', size =
       ref={ref}
       disabled={isLoading || props.disabled}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-2xl text-[15px] font-[590] transition-all duration-200 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0 [&_svg]:stroke-[1.75]",
+        "inline-flex items-center justify-center gap-2 rounded-2xl text-[15px] font-[590] transition-[transform,filter,opacity,background-color] duration-[160ms] ease-[var(--ease-out)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0 [&_svg]:stroke-[1.75]",
         {
           "bg-primary text-primary-foreground hover:bg-primary/90": variant === 'primary',
           "bg-secondary text-secondary-foreground hover:bg-secondary/80": variant === 'secondary',
@@ -43,7 +43,7 @@ export const Input = React.forwardRef(({ className, type, icon: Icon, ...props }
       <input
         type={type}
         className={cn(
-          "flex min-h-11 w-full rounded-2xl border-0 bg-input-background px-4 py-3 text-[17px] leading-[22px] text-foreground transition-all file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex min-h-11 w-full rounded-2xl border-0 bg-input-background px-4 py-3 text-[17px] leading-[22px] text-foreground transition-[transform,filter,opacity,background-color,border-color,box-shadow] duration-[160ms] ease-[var(--ease-out)] file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50",
           Icon && "pl-11",
           className
         )}

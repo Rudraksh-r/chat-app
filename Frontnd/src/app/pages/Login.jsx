@@ -22,8 +22,9 @@ export function Login() {
   return (
     <main className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-8 text-foreground">
       <Motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 16, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", bounce: 0, duration: 0.4 }}
         className="w-full max-w-[420px] rounded-[28px] bg-card px-5 py-6 shadow-[0_18px_50px_rgba(0,0,0,0.08)] sm:px-6"
       >
         <div className="mb-8 text-center">

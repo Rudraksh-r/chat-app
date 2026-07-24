@@ -13,6 +13,7 @@ const useAuthStore = create((set, get) => ({
   authUser: null,
   isLoading: false,
   isCheckingAuth: true,
+  isLoggingOut: false,
   isUploadingAvatar: false,
   myPrivateKey: null,
 
@@ -152,8 +153,10 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  logout: async () => {
+  logout: async (redirect = true) => {
+    set({ isLoggingOut: true });
     try {
+      await axiosInstance.post("/auth/logout");
       useSocketStore.getState().disconnectSocket();
       useChatStore.getState().clearChat();
       // NOTE: We do NOT delete the private key from IndexedDB on logout.
@@ -161,9 +164,15 @@ const useAuthStore = create((set, get) => ({
       // back in on the same device. Deleting the key would break that.
       // Explicit "clear this device" should be a separate UX action.
       set({ authUser: null });
-      toast.success("Logged out successfully");
+      if (redirect) {
+        toast.success("Logged out successfully");
+        window.location.href = "/login";
+      } else {
+        set({ isLoggingOut: false });
+      }
     } catch (error) {
-      toast.error("Logout failed");
+      if (redirect) toast.error("Logout failed");
+      set({ isLoggingOut: false });
     }
   },
 

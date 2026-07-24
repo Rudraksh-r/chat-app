@@ -23,13 +23,13 @@ function GuestRoute({ children }) {
 }
 
 export default function AppRoutes() {
-  const { checkAuth, isCheckingAuth, authUser } = useAuthStore();
+  const { checkAuth, isCheckingAuth, authUser, isLoggingOut } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
 
     const handleUnauthorized = () => {
-      useAuthStore.getState().logout();
+      useAuthStore.getState().logout(false);
     };
 
     window.addEventListener('auth:unauthorized', handleUnauthorized);
@@ -37,7 +37,7 @@ export default function AppRoutes() {
   }, [checkAuth]);
 
   // Show a loading spinner while we verify the session cookie with the backend
-  if (isCheckingAuth) {
+  if (isCheckingAuth || isLoggingOut) {
     return (
       <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />

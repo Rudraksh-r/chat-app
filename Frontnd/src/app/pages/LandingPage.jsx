@@ -18,8 +18,8 @@ import {
   Sun,
 } from "lucide-react";
 
-const springDefault = { type: "spring", stiffness: 300, damping: 30, mass: 0.9 };
-const springSnappy = { type: "spring", stiffness: 420, damping: 34, mass: 0.7 };
+const springDefault = { type: "spring", bounce: 0, duration: 0.4 };
+const springSnappy = { type: "spring", bounce: 0.2, duration: 0.4 };
 
 // ── Mock chat messages for the hero preview ──
 const mockMessages = [
@@ -199,7 +199,7 @@ function ChatPreview() {
             />
           </div>
           <motion.button
-            animate={{ scale: showSend ? 1 : 0, opacity: showSend ? 1 : 0 }}
+            animate={{ scale: showSend ? 1 : 0.95, opacity: showSend ? 1 : 0 }}
             transition={springSnappy}
             className="w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: "#007AFF" }}
@@ -435,7 +435,7 @@ export function LandingPage() {
             >
               <button
                 onClick={() => navigate("/signup")}
-                className="flex items-center gap-2 px-7 rounded-2xl"
+                className="flex items-center gap-2 px-7 rounded-2xl transition-[transform,background-color] duration-[160ms] ease-[var(--ease-out)] active:scale-[0.97]"
                 style={{
                   background: "#007AFF",
                   color: "#fff",
@@ -452,7 +452,7 @@ export function LandingPage() {
                 <ArrowUp size={16} strokeWidth={2.5} style={{ transform: "rotate(45deg)" }} />
               </button>
               <button
-                className="flex items-center gap-2 px-7 rounded-2xl"
+                className="flex items-center gap-2 px-7 rounded-2xl transition-[transform,background-color] duration-[160ms] ease-[var(--ease-out)] active:scale-[0.97]"
                 style={{
                   background: "var(--secondary)",
                   color: "var(--foreground)",

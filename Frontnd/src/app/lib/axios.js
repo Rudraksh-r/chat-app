@@ -30,8 +30,8 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // If error is 401, not a retry, and not the refresh endpoint itself
-    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/auth/refresh' && originalRequest.url !== '/auth/login') {
+    // If error is 401, not a retry, and not the refresh/login/logout endpoints
+    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== '/auth/refresh' && originalRequest.url !== '/auth/login' && originalRequest.url !== '/auth/logout') {
       
       if (isRefreshing) {
         return new Promise(function(resolve, reject) {

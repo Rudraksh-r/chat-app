@@ -114,6 +114,20 @@ const login = asyncHandler(async (req, res) => {
         )
 })
 
+const logout = asyncHandler(async (req, res) => {
+    const options = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict"
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User logged out successfully"))
+})
+
 const getUser = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id).select(
         "-password -refreshToken"
@@ -193,4 +207,4 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     }
 });
 
-export { registerUser, login, getUser, changePassword, refreshAccessToken }
+export { registerUser, login, logout, getUser, changePassword, refreshAccessToken }
