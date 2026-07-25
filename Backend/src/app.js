@@ -26,7 +26,7 @@ app.use(helmet({
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "https://ui-avatars.com"],
             mediaSrc: ["'self'", "https://res.cloudinary.com"],
-            connectSrc: ["'self'", "http://localhost:5001", "ws://localhost:5001", "https://your-api-domain", "wss://your-api-domain"],
+            connectSrc: ["'self'", "http://localhost:5001", "ws://localhost:5001"],
             frameAncestors: ["'none'"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
