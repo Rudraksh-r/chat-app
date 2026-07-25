@@ -179,6 +179,12 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  ::-webkit-scrollbar {
+    display: none;
   }
 
   body {
@@ -239,6 +245,9 @@
 @layer components {
   .app-shell {
     @apply bg-transparent;
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .glass-panel {

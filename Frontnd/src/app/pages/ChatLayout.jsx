@@ -458,10 +458,19 @@ export function ChatLayout() {
 
       {/* Sidebar */}
       <Motion.div
-        className={cn(
-          "fixed md:relative z-50 flex h-full w-full shrink-0 flex-col bg-sidebar transition-all duration-300 ease-out md:w-[360px] md:border-r md:border-sidebar-border",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-        )}
+        drag="x"
+        dragConstraints={{ right: 0 }}
+        dragElastic={0.1}
+        onDragEnd={(e, { offset, velocity }) => {
+          if (offset.x < -100 || velocity.x < -500) {
+            setSidebarOpen(false);
+          }
+        }}
+        initial={false}
+        animate={{ x: sidebarOpen ? 0 : "-100%" }}
+        transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+        style={{ touchAction: "pan-y" }}
+        className="fixed md:relative z-50 flex h-full w-full shrink-0 flex-col bg-sidebar md:w-[360px] md:border-r md:border-sidebar-border md:!transform-none"
       >
         {/* Sidebar Header */}
         <div className="px-4 pb-3 pt-6">
@@ -538,7 +547,7 @@ export function ChatLayout() {
         </div>
 
         {/* Search Results or Chat List */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {searchQuery ? (
             // Search results
             isSearching ? (
@@ -753,7 +762,7 @@ export function ChatLayout() {
             <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="custom-scrollbar flex-1 space-y-3 overflow-y-auto px-4 py-5 sm:px-6"
+              className="flex-1 space-y-3 overflow-y-auto px-4 py-5 sm:px-6"
               style={activeChatStyle}
             >
               {isLoadingMessages ? (
