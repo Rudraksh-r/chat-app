@@ -8,6 +8,7 @@ import {
   exportPublicKey,
   encryptPrivateKeyWithPassword,
   decryptPrivateKeyWithPassword,
+  getPublicKeyFromPrivateKey,
 } from "../lib/crypto";
 import { getPrivateKey, storePrivateKey } from "../lib/keyStorage";
 
@@ -35,27 +36,65 @@ const useAuthStore = create((set, get) => ({
       try {
         const existingPrivateKey = await getPrivateKey(user._id);
 
-        // ── Case 1: Local key exists — we're good ──────────────────────
+        // ── Case 1: Local key exists — verify or migrate ──────────────
         if (existingPrivateKey) {
-          console.log("✅ E2EE: Existing keypair found in IndexedDB");
+          let keysMatch = true;
 
-          // If server doesn't have an encrypted backup yet, upload one
-          // (migration path for users who had keys before this feature)
-          if (password && !user.encryptedPrivateKey) {
+          if (user.publicKey) {
             try {
-              const encrypted = await encryptPrivateKeyWithPassword(existingPrivateKey, password);
-              await axiosInstance.put("/user/encrypted-private-key", {
-                encryptedPrivateKey: encrypted.encryptedPrivateKey,
-                privateKeyIv: encrypted.iv,
-                privateKeySalt: encrypted.salt,
+              const localPub = await getPublicKeyFromPrivateKey(existingPrivateKey);
+              const localPubB64 = await exportPublicKey(localPub);
+              if (localPubB64 !== user.publicKey) {
+                console.warn("⚠️ E2EE: Local key matches but server public key is different (device reset/re-generation). Discarding local key.");
+                keysMatch = false;
+              }
+            } catch (verifyErr) {
+              console.error("❌ E2EE: Verification of local key failed:", verifyErr.message);
+              keysMatch = false;
+            }
+          } else {
+            // Server doesn't have a public key, but we have one locally. Re-upload it.
+            try {
+              const localPub = await getPublicKeyFromPrivateKey(existingPrivateKey);
+              const localPubB64 = await exportPublicKey(localPub);
+              await axiosInstance.put("/user/public-key", {
+                publicKey: localPubB64,
               });
-              console.log("✅ E2EE: Migrated existing key — encrypted backup uploaded to server");
-            } catch (migrationErr) {
-              console.warn("⚠️ E2EE: Failed to upload key backup (non-critical):", migrationErr.message);
+              if (password) {
+                const encrypted = await encryptPrivateKeyWithPassword(existingPrivateKey, password);
+                await axiosInstance.put("/user/encrypted-private-key", {
+                  encryptedPrivateKey: encrypted.encryptedPrivateKey,
+                  privateKeyIv: encrypted.iv,
+                  privateKeySalt: encrypted.salt,
+                });
+              }
+              console.log("✅ E2EE: Re-uploaded missing public key to server");
+            } catch (uploadErr) {
+              console.error("❌ E2EE: Re-uploading missing public key failed:", uploadErr.message);
             }
           }
 
-          return true;
+          if (keysMatch) {
+            console.log("✅ E2EE: Existing keypair found in IndexedDB and matches server");
+
+            // If server doesn't have an encrypted backup yet, upload one
+            // (migration path for users who had keys before this feature)
+            if (password && !user.encryptedPrivateKey) {
+              try {
+                const encrypted = await encryptPrivateKeyWithPassword(existingPrivateKey, password);
+                await axiosInstance.put("/user/encrypted-private-key", {
+                  encryptedPrivateKey: encrypted.encryptedPrivateKey,
+                  privateKeyIv: encrypted.iv,
+                  privateKeySalt: encrypted.salt,
+                });
+                console.log("✅ E2EE: Migrated existing key — encrypted backup uploaded to server");
+              } catch (migrationErr) {
+                console.warn("⚠️ E2EE: Failed to upload key backup (non-critical):", migrationErr.message);
+              }
+            }
+
+            return true;
+          }
         }
 
         // ── Case 2: No local key, but server has encrypted backup ──────

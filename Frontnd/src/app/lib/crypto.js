@@ -50,6 +50,18 @@ export async function deriveSharedKey(myPrivateKey, theirPublicKey) {
     );
 }
 
+export async function getPublicKeyFromPrivateKey(privateKey) {
+    const jwk = await crypto.subtle.exportKey("jwk", privateKey);
+    const { d, ...publicJwk } = jwk;
+    return crypto.subtle.importKey(
+        "jwk",
+        publicJwk,
+        ECDH_ALGORITHM,
+        true,
+        []
+    );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1:1 ENCRYPTION (unchanged from 1:1 implementation)
 // ─────────────────────────────────────────────────────────────────────────────
