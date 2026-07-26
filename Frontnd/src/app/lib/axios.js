@@ -25,6 +25,17 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const accessToken = localStorage.getItem("accessToken");
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -47,7 +58,14 @@ axiosInstance.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+        const refreshToken = localStorage.getItem("refreshToken");
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { withCredentials: true });
+        
+        const newAccessToken = response.data.data?.accessToken;
+        if (newAccessToken) {
+          localStorage.setItem("accessToken", newAccessToken);
+        }
+
         processQueue(null);
         return axiosInstance(originalRequest);
       } catch (refreshError) {

@@ -237,7 +237,10 @@ const useAuthStore = create((set, get) => ({
         publicKey: null,
       });
 
-      const { createdUser } = res.data.data;
+      const { createdUser, accessToken, refreshToken } = res.data.data;
+
+      if (accessToken) localStorage.setItem("accessToken", accessToken);
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
 
       set({ authUser: createdUser });
       useSocketStore.getState().connectSocket(createdUser._id);
@@ -260,7 +263,10 @@ const useAuthStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const res = await axiosInstance.post("/auth/login", formData);
-      const { loggedInUser } = res.data.data;
+      const { loggedInUser, accessToken, refreshToken } = res.data.data;
+
+      if (accessToken) localStorage.setItem("accessToken", accessToken);
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
 
       set({ authUser: loggedInUser });
       useSocketStore.getState().connectSocket(loggedInUser._id);
@@ -290,9 +296,11 @@ const useAuthStore = create((set, get) => ({
   logout: async (redirect = true) => {
     set({ isLoggingOut: true });
     try {
-      await axiosInstance.post("/auth/logout");
+      await axiosInstance.post("/auth/logout").catch(() => {});
       useSocketStore.getState().disconnectSocket();
       useChatStore.getState().clearChat();
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
       // NOTE: We do NOT delete the private key from IndexedDB on logout.
       // The user expects to be able to decrypt their history when they log
       // back in on the same device. Deleting the key would break that.
