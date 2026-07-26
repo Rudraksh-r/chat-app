@@ -292,6 +292,111 @@ export async function decryptGroupMessage(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PASSWORD-BASED KEY ENCRYPTION (for cross-device sync)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Derives an AES-256-GCM key from a password using PBKDF2.
+ * Used to encrypt/decrypt the user's ECDH private key for server storage.
+ *
+ * @param {string} password - The user's login password
+ * @param {Uint8Array} salt - 16-byte random salt (generated once, stored on server)
+ * @returns {Promise<CryptoKey>} AES-GCM key derived from the password
+ */
+export async function deriveKeyFromPassword(password, salt) {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(password),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+    );
+
+    return crypto.subtle.deriveKey(
+        {
+            name: "PBKDF2",
+            salt,
+            iterations: 600000,   // OWASP recommended minimum for PBKDF2-SHA256
+            hash: "SHA-256",
+        },
+        keyMaterial,
+        AES_ALGORITHM,
+        false,
+        ["encrypt", "decrypt"]
+    );
+}
+
+/**
+ * Encrypts the ECDH private key (as JWK JSON string) using a password-derived key.
+ * The result is stored on the server for cross-device retrieval.
+ *
+ * @param {CryptoKey} privateKey - The ECDH private key to encrypt
+ * @param {string} password - The user's password
+ * @returns {{ encryptedPrivateKey: string, iv: string, salt: string }} All base64-encoded
+ */
+export async function encryptPrivateKeyWithPassword(privateKey, password) {
+    // Export private key to JWK, then serialize to JSON string
+    const jwk = await crypto.subtle.exportKey("jwk", privateKey);
+    const plaintext = new TextEncoder().encode(JSON.stringify(jwk));
+
+    // Generate random salt and IV
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+
+    // Derive encryption key from password
+    const derivedKey = await deriveKeyFromPassword(password, salt);
+
+    // Encrypt
+    const ciphertext = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        derivedKey,
+        plaintext
+    );
+
+    return {
+        encryptedPrivateKey: arrayBufferToBase64(ciphertext),
+        iv:                  arrayBufferToBase64(iv),
+        salt:                arrayBufferToBase64(salt),
+    };
+}
+
+/**
+ * Decrypts the ECDH private key from server-stored encrypted data.
+ *
+ * @param {string} encryptedB64 - Base64-encoded encrypted JWK
+ * @param {string} ivB64 - Base64-encoded IV
+ * @param {string} saltB64 - Base64-encoded PBKDF2 salt
+ * @param {string} password - The user's password
+ * @returns {Promise<CryptoKey>} The restored ECDH private key
+ */
+export async function decryptPrivateKeyWithPassword(encryptedB64, ivB64, saltB64, password) {
+    const encrypted = base64ToArrayBuffer(encryptedB64);
+    const iv        = base64ToArrayBuffer(ivB64);
+    const salt      = new Uint8Array(base64ToArrayBuffer(saltB64));
+
+    // Derive the same key from password + salt
+    const derivedKey = await deriveKeyFromPassword(password, salt);
+
+    // Decrypt
+    const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: new Uint8Array(iv) },
+        derivedKey,
+        encrypted
+    );
+
+    // Parse JWK and import as CryptoKey
+    const jwk = JSON.parse(new TextDecoder().decode(decrypted));
+    return crypto.subtle.importKey(
+        "jwk",
+        jwk,
+        ECDH_ALGORITHM,
+        true,
+        ["deriveKey", "deriveBits"]
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // UTILITIES
 // ─────────────────────────────────────────────────────────────────────────────
 

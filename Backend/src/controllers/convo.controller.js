@@ -28,7 +28,7 @@ const createConvo = asyncHandler(async (req, res) => {
 
   let conversation = await Conversation.findOne({
     members: { $all: [senderId, receiverId] },
-  }).populate("members", "fullName username email avatar lastSeen");
+  }).populate("members", "fullName username email avatar lastSeen publicKey");
 
   if (!conversation) {
     const receiver = await User.findById(receiverId);
@@ -48,7 +48,7 @@ const createConvo = asyncHandler(async (req, res) => {
     });
     conversation = await conversation.populate(
       "members",
-      "fullName username email avatar lastSeen",
+      "fullName username email avatar lastSeen publicKey",
     );
   }
 
@@ -76,7 +76,7 @@ const createGroupChat = asyncHandler(async (req, res) => {
   });
 
   const fullyPopulatedGroup = await Conversation.findById(newGroup._id)
-    .populate("members", "fullName username email avatar lastSeen")
+    .populate("members", "fullName username email avatar lastSeen publicKey")
     .populate("groupAdmins", "fullName username email avatar");
 
   await GroupAuditLog.create({
@@ -110,7 +110,7 @@ const addGroupMembers = asyncHandler(async (req, res) => {
       $addToSet: { members: { $each: newUserIds } },
     },
     { new: true },
-  ).populate("members", "fullName username email avatar lastSeen");
+  ).populate("members", "fullName username email avatar lastSeen publicKey");
 
   await GroupAuditLog.create({
     convoId: updatedGroup._id,
@@ -165,7 +165,7 @@ const removeGroupMember = asyncHandler(async (req, res) => {
       },
     },
     { new: true },
-  ).populate("members", "fullName username email avatar lastSeen");
+  ).populate("members", "fullName username email avatar lastSeen publicKey");
 
   await GroupAuditLog.create({
     convoId: updatedGroup._id,
@@ -294,7 +294,7 @@ const getAllConvo = asyncHandler(async (req, res) => {
   const conversations = await Conversation.find({
     members: req.user._id,
   })
-    .populate("members", "fullName username email avatar lastSeen")
+    .populate("members", "fullName username email avatar lastSeen publicKey")
     .populate("groupAdmins", "fullName username email avatar lastSeen")
     .sort({ updatedAt: -1 });
 

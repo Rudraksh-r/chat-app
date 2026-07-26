@@ -66,6 +66,22 @@ const userSchema = new Schema(
         ref: "User",
       },
     ],
+    // ─── E2EE: Server-stored encrypted private key for cross-device sync ──
+    // The private key is encrypted client-side with a PBKDF2-derived key
+    // from the user's password before being sent to the server.
+    // The server never sees the plaintext private key.
+    encryptedPrivateKey: {
+      type: String,
+      default: null,
+    },
+    privateKeyIv: {
+      type: String,
+      default: null,
+    },
+    privateKeySalt: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true },
 );

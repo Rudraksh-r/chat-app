@@ -253,7 +253,7 @@ const useChatStore = create((set, get) => ({
   },
 
   // chatStore.js
-  decryptGroupMessageItem: async (message) => {
+  decryptGroupMessageItem: async (message, bypassReplayGuard = false) => {
     const { authUser } = useAuthStore.getState();
     const senderId = (message.senderId?._id ?? message.senderId).toString();
     const convoId = message.convoId.toString();
@@ -290,7 +290,7 @@ const useChatStore = create((set, get) => ({
       }
     }
 
-    // ── Peer-sent messages: unchanged from your existing logic ──────────
+    // ── Peer-sent messages ──────────────────────────────────────────────
     const peerKeyData = await getPeerSenderKey(convoId, senderId);
     if (!peerKeyData) {
       return null;
@@ -309,9 +309,11 @@ const useChatStore = create((set, get) => ({
         message.ciphertext,
         message.counter,
         peerKeyData.key,
-        peerKeyData.lastCounter,
+        bypassReplayGuard ? -1 : peerKeyData.lastCounter,
       );
-      await updatePeerCounter(convoId, senderId, message.counter);
+      if (!bypassReplayGuard) {
+        await updatePeerCounter(convoId, senderId, message.counter);
+      }
       return { ...message, decryptedText: plaintext };
     } catch (error) {
       console.warn(
@@ -666,7 +668,7 @@ const useChatStore = create((set, get) => ({
 
         decrypted = await Promise.all(
           textMessages.map(async (msg) => {
-            const result = await get().decryptGroupMessageItem(msg);
+            const result = await get().decryptGroupMessageItem(msg, true);
 
             if (result === null) {
               // Peer key not available yet — queue for retry when the
@@ -818,7 +820,15 @@ sendMessage: async (text, file = null) => {
       return { messages: [...state.messages, sentMessage] };
     });
 
-    const lastMessageLabel = text || (file ? "📎 Attachment" : "New message");
+    const lastMessageLabel = text || (file
+      ? file.type.startsWith("image/")
+        ? "📷 Image"
+        : file.type.startsWith("video/")
+          ? "🎥 Video"
+          : file.type.startsWith("audio/")
+            ? "🎵 Audio"
+            : "📎 Document"
+      : "New message");
 
     // Update sidebar
     set((state) => ({
@@ -954,11 +964,13 @@ sendMessage: async (text, file = null) => {
         decryptedMessage?.decryptedText ||
         (message.image
           ? "📷 Image"
-          : message.audio?.url
-            ? "🎵 Audio"
-            : message.document?.url
-              ? "📎 Document"
-              : "New message");
+          : message.video?.url
+            ? "🎥 Video"
+            : message.audio?.url
+              ? "🎵 Audio"
+              : message.document?.url
+                ? "📎 Document"
+                : "New message");
       toast(`New message from ${senderName}`, { description: previewText });
 
       set((state) => ({
@@ -975,11 +987,13 @@ sendMessage: async (text, file = null) => {
       message.text ||
       (message.image
         ? "📷 Image"
-        : message.audio?.url
-          ? "🎵 Audio"
-          : message.document?.url
-            ? "📎 Document"
-            : "");
+        : message.video?.url
+          ? "🎥 Video"
+          : message.audio?.url
+            ? "🎵 Audio"
+            : message.document?.url
+              ? "📎 Document"
+              : "");
 
     set((state) => ({
       conversations: state.conversations.map((c) =>
@@ -1119,10 +1133,43 @@ sendMessage: async (text, file = null) => {
                   const res = await axiosInstance.get(
                     `/message/${activeConversation._id}?limit=20&page=${nextPage}`,
                   );
-                  const { messages: newMessages, hasMore: nextHasMore } = res.data.data;
+                  const { messages: rawNewMessages, hasMore: nextHasMore } = res.data.data;
+
+                  const isGroup = activeConversation.isGroupChat;
+                  let decryptedNew;
+
+                  if (isGroup) {
+                    const textMessages = rawNewMessages.filter((m) => m.type === "text");
+                    decryptedNew = await Promise.all(
+                      textMessages.map(async (msg) => {
+                        const result = await get().decryptGroupMessageItem(msg, true);
+                        if (result === null) {
+                          const senderId = (msg.senderId?._id ?? msg.senderId).toString();
+                          const queueKey = `${msg.convoId}:${senderId}`;
+                          const existing = pendingMessageQueue.get(queueKey) ?? [];
+                          pendingMessageQueue.set(queueKey, [...existing, msg]);
+                          return { ...msg, decryptedText: "[Awaiting decryption key...]" };
+                        }
+                        return result;
+                      })
+                    );
+                  } else {
+                    const { authUser } = useAuthStore.getState();
+                    const otherUser = activeConversation.members?.find(
+                      (m) => (m._id ?? m).toString() !== authUser._id.toString(),
+                    );
+                    if (!otherUser) {
+                      decryptedNew = rawNewMessages;
+                    } else {
+                      const otherId = (otherUser._id ?? otherUser).toString();
+                      decryptedNew = await Promise.all(
+                        rawNewMessages.map((msg) => get().decryptOneToOneMessage(msg, otherId)),
+                      );
+                    }
+                  }
 
                   set({
-                    messages: [...newMessages, ...messages],
+                    messages: [...decryptedNew, ...messages],
                     page: nextPage,
                     hasMore: nextHasMore,
                   });
@@ -1209,11 +1256,13 @@ sendMessage: async (text, file = null) => {
                                     : lastMsg.text ||
                                     (lastMsg.image
                                       ? "📷 Image"
-                                      : lastMsg.audio?.url
-                                        ? "🎵 Audio"
-                                        : lastMsg.document?.url
-                                          ? "📎 Document"
-                                          : "");
+                                      : lastMsg.video?.url
+                                        ? "🎥 Video"
+                                        : lastMsg.audio?.url
+                                          ? "🎵 Audio"
+                                          : lastMsg.document?.url
+                                            ? "📎 Document"
+                                            : "");
                                 } else {
                                   sidebarMessageText = "No messages yet";
                                 }

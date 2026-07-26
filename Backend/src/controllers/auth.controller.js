@@ -7,7 +7,7 @@ import jwt from "jsonwebtoken";
 
 const registerUser = asyncHandler(async (req, res) => {
     // req.body is already validated by registerSchema
-    const { fullName, username, email, password, publicKey = null } = req.body;
+    const { fullName, username, email, password, publicKey = null, encryptedPrivateKey = null, privateKeyIv = null, privateKeySalt = null } = req.body;
 
     const existingUser = await User.findOne({ email })
 
@@ -28,6 +28,9 @@ const registerUser = asyncHandler(async (req, res) => {
         email,
         password,
         publicKey,
+        encryptedPrivateKey,
+        privateKeyIv,
+        privateKeySalt,
     })
 
     const createdUser = await User.findById(user._id).select(

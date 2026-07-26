@@ -10,6 +10,7 @@ import {
   blockUser,
   unblockUser,
   getBlockedUsers,
+  updateEncryptedPrivateKey,
 } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
@@ -30,6 +31,7 @@ router.get("/search", verifyJWT, moderateLimiter, validate(searchQuerySchema, "q
 router.get("/public-key/:userId", verifyJWT, validate(userIdParamSchema, "params"), getUserPublicKey);
 router.put("/profile", verifyJWT, validate(updateProfileSchema), updateProfile);
 router.put("/public-key", verifyJWT, validate(updatePublicKeySchema), updatePublicKey);
+router.put("/encrypted-private-key", verifyJWT, updateEncryptedPrivateKey);
 
 // single("avatar") tells multer to look for a field named "avatar" in the form
 router.put("/avatar", verifyJWT, upload.single("avatar"), updateAvatar);

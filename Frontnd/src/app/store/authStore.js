@@ -3,7 +3,12 @@ import axiosInstance from "../lib/axios";
 import { toast } from "sonner";
 import useSocketStore from "./socketStore";
 import useChatStore from "./chatStore";
-import { generateKeyPair, exportPublicKey } from "../lib/crypto";
+import {
+  generateKeyPair,
+  exportPublicKey,
+  encryptPrivateKeyWithPassword,
+  decryptPrivateKeyWithPassword,
+} from "../lib/crypto";
 import { getPrivateKey, storePrivateKey } from "../lib/keyStorage";
 
 let cryptoSetupPromise = null;
@@ -16,47 +21,104 @@ const useAuthStore = create((set, get) => ({
   isLoggingOut: false,
   isUploadingAvatar: false,
   myPrivateKey: null,
+  needsKeyRestore: false, // true if no local key and server has encrypted backup
 
   // ── Ensure keypair exists on this device ─────────────────────────────────
-  // This runs in the background after auth so the main auth UX is never blocked.
-  _setupCrypto: async (user) => {
+  // password is only available during explicit login/signup, NOT during checkAuth.
+  // If no local key and no password provided (checkAuth), we set needsKeyRestore flag.
+  _setupCrypto: async (user, password = null) => {
     if (!user?._id) return false;
 
-    // Prevents two concurrent calls (React StrictMode's double-effect,
-    // or checkAuth + login racing) from each generating a DIFFERENT
-    // keypair and racing to upload — which leaves the local private key
-    // and server public key permanently out of sync.
     if (cryptoSetupPromise) return cryptoSetupPromise;
 
     cryptoSetupPromise = (async () => {
       try {
         const existingPrivateKey = await getPrivateKey(user._id);
-        const hasServerPublicKey = Boolean(user.publicKey);
 
-        if (existingPrivateKey && hasServerPublicKey) {
+        // ── Case 1: Local key exists — we're good ──────────────────────
+        if (existingPrivateKey) {
           console.log("✅ E2EE: Existing keypair found in IndexedDB");
+
+          // If server doesn't have an encrypted backup yet, upload one
+          // (migration path for users who had keys before this feature)
+          if (password && !user.encryptedPrivateKey) {
+            try {
+              const encrypted = await encryptPrivateKeyWithPassword(existingPrivateKey, password);
+              await axiosInstance.put("/user/encrypted-private-key", {
+                encryptedPrivateKey: encrypted.encryptedPrivateKey,
+                privateKeyIv: encrypted.iv,
+                privateKeySalt: encrypted.salt,
+              });
+              console.log("✅ E2EE: Migrated existing key — encrypted backup uploaded to server");
+            } catch (migrationErr) {
+              console.warn("⚠️ E2EE: Failed to upload key backup (non-critical):", migrationErr.message);
+            }
+          }
+
           return true;
         }
 
-        if (existingPrivateKey && !hasServerPublicKey) {
-          console.warn(
-            "⚠️ E2EE: Local private key found but server public key missing. Regenerating keypair.",
-          );
-        } else {
-          console.log(
-            "🔑 E2EE: No keypair found — generating new keypair for this device",
-          );
+        // ── Case 2: No local key, but server has encrypted backup ──────
+        if (user.encryptedPrivateKey && user.privateKeyIv && user.privateKeySalt) {
+          if (!password) {
+            // checkAuth path — no password available. Flag for UI prompt.
+            console.warn("⚠️ E2EE: Encrypted key backup exists on server but no password available to decrypt.");
+            set({ needsKeyRestore: true });
+            return false;
+          }
+
+          try {
+            console.log("🔑 E2EE: Restoring private key from server backup...");
+            const restoredKey = await decryptPrivateKeyWithPassword(
+              user.encryptedPrivateKey,
+              user.privateKeyIv,
+              user.privateKeySalt,
+              password
+            );
+
+            await storePrivateKey(user._id, restoredKey);
+            set({ needsKeyRestore: false });
+            console.log("✅ E2EE: Private key restored from server backup");
+            return true;
+          } catch (restoreErr) {
+            console.error("❌ E2EE: Failed to restore key from server backup:", restoreErr.message);
+            // Key restore failed — might be wrong password or corrupted data
+            // Fall through to generate new keypair
+          }
         }
 
+        // ── Case 3: No local key and no server backup — generate new ───
+        if (!password) {
+          console.warn("⚠️ E2EE: No key anywhere and no password to generate. Needs login.");
+          set({ needsKeyRestore: true });
+          return false;
+        }
+
+        console.log("🔑 E2EE: No keypair found — generating new keypair");
         const keyPair = await generateKeyPair();
         const publicKeyB64 = await exportPublicKey(keyPair.publicKey);
 
+        // Store locally
         await storePrivateKey(user._id, keyPair.privateKey);
+
+        // Encrypt private key with password for server backup
+        const encrypted = await encryptPrivateKeyWithPassword(keyPair.privateKey, password);
+
+        // Upload public key + encrypted private key to server
+        await axiosInstance.put("/user/encrypted-private-key", {
+          publicKey: publicKeyB64,
+          encryptedPrivateKey: encrypted.encryptedPrivateKey,
+          privateKeyIv: encrypted.iv,
+          privateKeySalt: encrypted.salt,
+        });
+
+        // Also update publicKey separately for backwards compat
         await axiosInstance.put("/user/public-key", {
           publicKey: publicKeyB64,
         });
 
-        console.log("✅ E2EE: New keypair generated and public key uploaded");
+        set({ needsKeyRestore: false });
+        console.log("✅ E2EE: New keypair generated, encrypted backup uploaded");
         return true;
       } catch (error) {
         console.error("❌ E2EE: Key generation/setup failed:", error);
@@ -69,11 +131,41 @@ const useAuthStore = create((set, get) => ({
     return cryptoSetupPromise;
   },
 
-  ensureKeyPair: async (userId, hasServerPublicKey = true) => {
-    return get()._setupCrypto({
-      _id: userId,
-      publicKey: hasServerPublicKey ? "present" : null,
-    });
+  // Restore key from server backup (called when user enters password from UI prompt)
+  restoreKeyFromPassword: async (password) => {
+    const { authUser } = get();
+    if (!authUser) return false;
+
+    set({ isLoading: true });
+    try {
+      // Re-fetch user to get encrypted key data
+      const res = await axiosInstance.get("/auth/get-user");
+      const user = res.data.data;
+
+      if (!user.encryptedPrivateKey || !user.privateKeyIv || !user.privateKeySalt) {
+        // No encrypted backup on server — need to generate fresh
+        const result = await get()._setupCrypto(user, password);
+        set({ authUser: user, isLoading: false });
+        return result;
+      }
+
+      const restoredKey = await decryptPrivateKeyWithPassword(
+        user.encryptedPrivateKey,
+        user.privateKeyIv,
+        user.privateKeySalt,
+        password
+      );
+
+      await storePrivateKey(user._id, restoredKey);
+      set({ needsKeyRestore: false, authUser: user, isLoading: false });
+      toast.success("Encryption keys restored successfully!");
+      return true;
+    } catch (error) {
+      console.error("❌ E2EE: Key restore failed:", error);
+      toast.error("Failed to restore encryption keys. Check your password.");
+      set({ isLoading: false });
+      return false;
+    }
   },
 
   checkAuth: async () => {
@@ -83,6 +175,7 @@ const useAuthStore = create((set, get) => ({
       set({ authUser: user });
 
       useSocketStore.getState().connectSocket(user._id);
+      // checkAuth has no password — _setupCrypto will use local key or flag needsKeyRestore
       void get()._setupCrypto(user).catch((err) => {
         console.error("E2EE setup failed during checkAuth:", err?.message || err);
       });
@@ -109,7 +202,8 @@ const useAuthStore = create((set, get) => ({
 
       set({ authUser: createdUser });
       useSocketStore.getState().connectSocket(createdUser._id);
-      void get()._setupCrypto(createdUser).catch((err) => {
+      // Pass password so _setupCrypto can generate keypair and upload encrypted backup
+      void get()._setupCrypto(createdUser, formData.password).catch((err) => {
         console.error("E2EE setup failed after signup:", err?.message || err);
       });
       toast.success("Account created successfully!");
@@ -133,7 +227,8 @@ const useAuthStore = create((set, get) => ({
       useSocketStore.getState().connectSocket(loggedInUser._id);
       toast.success("Welcome back!");
 
-      void get()._setupCrypto(loggedInUser).then((result) => {
+      // Pass password so _setupCrypto can restore key from server backup if needed
+      void get()._setupCrypto(loggedInUser, formData.password).then((result) => {
         if (!result) {
           toast.warning(
             "Encryption setup had an issue. Reload if messages don't decrypt.",
@@ -163,7 +258,7 @@ const useAuthStore = create((set, get) => ({
       // The user expects to be able to decrypt their history when they log
       // back in on the same device. Deleting the key would break that.
       // Explicit "clear this device" should be a separate UX action.
-      set({ authUser: null });
+      set({ authUser: null, needsKeyRestore: false });
       if (redirect) {
         toast.success("Logged out successfully");
         window.location.href = "/login";

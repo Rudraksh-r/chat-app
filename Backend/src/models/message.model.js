@@ -37,6 +37,12 @@ const messageSchema = new Schema(
       name: { type: String, default: "" },
       duration: { type: Number, default: 0 },
     },
+    video: {
+      url: { type: String, default: "" },
+      name: { type: String, default: "" },
+      size: { type: Number, default: 0 },
+      duration: { type: Number, default: 0 },
+    },
     status: {
       type: String,
       enum: ["sent", "delivered", "seen"],

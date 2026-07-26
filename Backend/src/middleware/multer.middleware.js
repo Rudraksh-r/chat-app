@@ -12,6 +12,11 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/gif",
   "image/webp",
   "image/svg+xml",
+  // Video (Cloudinary handles these under resource_type: "video")
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
   // Audio (Cloudinary handles these under resource_type: "video")
   "audio/mpeg",
   "audio/wav",

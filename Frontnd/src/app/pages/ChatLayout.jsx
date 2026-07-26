@@ -44,7 +44,7 @@ import ThemePicker, { CHAT_THEMES } from "../components/ThemePicker";
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 export function ChatLayout() {
-  const { authUser, logout } = useAuthStore();
+  const { authUser, logout, needsKeyRestore, restoreKeyFromPassword } = useAuthStore();
   const { theme, toggleTheme, chatThemes } = useThemeStore();
   const {
     conversations,
@@ -56,6 +56,7 @@ export function ChatLayout() {
     hasMore,
     onlineUsers,
     typingUsers,
+    isSending,
     getConversations,
     setActiveConversation,
     sendMessage,
@@ -95,6 +96,19 @@ export function ChatLayout() {
   const [contextMenuMsgId, setContextMenuMsgId] = useState(null);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editMessageText, setEditMessageText] = useState("");
+  const [restorePassword, setRestorePassword] = useState("");
+  const [isRestoringKey, setIsRestoringKey] = useState(false);
+
+  const handleRestoreKey = async (e) => {
+    e.preventDefault();
+    if (!restorePassword) return;
+    setIsRestoringKey(true);
+    const success = await restoreKeyFromPassword(restorePassword);
+    setIsRestoringKey(false);
+    if (success) {
+      setRestorePassword("");
+    }
+  };
 
   useEffect(() => {
     const handleClick = () => setContextMenuMsgId(null);
@@ -293,6 +307,10 @@ export function ChatLayout() {
       setMediaPreviewType("image");
       const objectUrl = URL.createObjectURL(file);
       setMediaPreview(objectUrl);
+    } else if (file.type.startsWith("video/")) {
+      setMediaPreviewType("video");
+      const objectUrl = URL.createObjectURL(file);
+      setMediaPreview(objectUrl);
     } else if (file.type.startsWith("audio/")) {
       setMediaPreviewType("audio");
       setMediaPreview(file.name);
@@ -305,7 +323,7 @@ export function ChatLayout() {
   const removefile = () => {
     // Revoke object URL to prevent memory leaks
     if (
-      mediaPreviewType === "image" &&
+      (mediaPreviewType === "image" || mediaPreviewType === "video") &&
       mediaPreview &&
       mediaPreview.startsWith("blob:")
     ) {
@@ -440,6 +458,48 @@ export function ChatLayout() {
           : "Offline";
     }
   };
+
+  if (needsKeyRestore) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-background px-4">
+        <div className="glass-thick w-full max-w-md rounded-[32px] p-8 text-center border border-border">
+          <div className="mb-6 flex mx-auto size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Settings className="size-8 animate-pulse" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2 text-foreground">Restore Encryption Keys</h2>
+          <p className="text-sm text-label-secondary mb-6 leading-relaxed">
+            To decrypt your chat history on this device, please enter your password. This restores your E2EE key backup securely.
+          </p>
+          <form onSubmit={handleRestoreKey} className="flex flex-col gap-4">
+            <input
+              type="password"
+              placeholder="Enter your password"
+              value={restorePassword}
+              onChange={(e) => setRestorePassword(e.target.value)}
+              disabled={isRestoringKey}
+              className="h-12 w-full rounded-2xl border border-border bg-secondary/30 px-4 text-center text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+              required
+            />
+            <Button type="submit" className="h-12 w-full rounded-2xl font-medium" disabled={isRestoringKey}>
+              {isRestoringKey ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="size-5 animate-spin" /> Restoring...
+                </span>
+              ) : (
+                "Restore Keys"
+              )}
+            </Button>
+          </form>
+          <button
+            onClick={() => logout()}
+            className="mt-6 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Log Out
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background font-sans text-foreground app-shell">
@@ -986,11 +1046,13 @@ export function ChatLayout() {
                                     {msg.replyTo.text ||
                                       (msg.replyTo.image
                                         ? "📷 Image"
-                                        : msg.replyTo.audio?.url
-                                          ? "🎵 Audio"
-                                          : msg.replyTo.document?.url
-                                            ? "📎 Document"
-                                            : "Attachment")}
+                                        : msg.replyTo.video?.url
+                                          ? "🎥 Video"
+                                          : msg.replyTo.audio?.url
+                                            ? "🎵 Audio"
+                                            : msg.replyTo.document?.url
+                                              ? "📎 Document"
+                                              : "Attachment")}
                                   </p>
                                 </div>
                               )}
@@ -1002,6 +1064,14 @@ export function ChatLayout() {
                                   onClick={() =>
                                     setSelectedImageModal(msg.image)
                                   }
+                                />
+                              )}
+                              {msg.video?.url && (
+                                <video
+                                  src={msg.video.url}
+                                  controls
+                                  preload="metadata"
+                                  className="max-w-full sm:max-w-[320px] rounded-md border border-border"
                                 />
                               )}
                               {msg.audio?.url && (
@@ -1347,11 +1417,13 @@ export function ChatLayout() {
                       {replyingToMessage.text ||
                         (replyingToMessage.image
                           ? "📷 Image"
-                          : replyingToMessage.audio?.url
-                            ? "🎵 Audio"
-                            : replyingToMessage.document?.url
-                              ? "📎 Document"
-                              : "Attachment")}
+                          : replyingToMessage.video?.url
+                            ? "🎥 Video"
+                            : replyingToMessage.audio?.url
+                              ? "🎵 Audio"
+                              : replyingToMessage.document?.url
+                                ? "📎 Document"
+                                : "Attachment")}
                     </p>
                   </div>
                   <button
@@ -1371,16 +1443,53 @@ export function ChatLayout() {
                         alt="Preview"
                         className="w-full h-full object-cover"
                       />
-                      <button
-                        onClick={removefile}
-                        type="button"
-                      className="absolute right-1 top-1 flex size-7 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {isSending && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 animate-spin text-white" />
+                        </div>
+                      )}
+                      {!isSending && (
+                        <button
+                          onClick={removefile}
+                          type="button"
+                          className="absolute right-1 top-1 flex size-7 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ) : mediaPreviewType === "video" ? (
+                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border mx-auto">
+                      <video
+                        src={mediaPreview}
+                        className="w-full h-full object-cover"
+                        muted
+                        playsInline
+                        autoPlay
+                        loop
+                      />
+                      {isSending && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 animate-spin text-white" />
+                        </div>
+                      )}
+                      {!isSending && (
+                        <button
+                          onClick={removefile}
+                          type="button"
+                          className="absolute right-1 top-1 flex size-7 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black/80"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   ) : (
-                    <div className="mx-auto flex max-w-xs items-center gap-3 rounded-2xl bg-card px-4 py-3">
+                    <div className="mx-auto flex max-w-xs items-center gap-3 rounded-2xl bg-card px-4 py-3 relative overflow-hidden">
+                      {isSending && (
+                        <div className="absolute inset-0 bg-black/10 flex items-center justify-center z-10">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        </div>
+                      )}
                       <div
                         className={cn(
                           "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
@@ -1406,13 +1515,15 @@ export function ChatLayout() {
                               : `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`)}
                         </p>
                       </div>
-                      <button
-                        onClick={removefile}
-                        type="button"
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {!isSending && (
+                        <button
+                          onClick={removefile}
+                          type="button"
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors shrink-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1423,7 +1534,7 @@ export function ChatLayout() {
               >
                 <input
                   type="file"
-                  accept="image/*,audio/*,.pdf,.doc,.docx,.txt"
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
                   className="hidden"
                   ref={fileInputRef}
                   onChange={handleFileChange}
@@ -1463,8 +1574,9 @@ export function ChatLayout() {
                   <textarea
                     value={messageText}
                     onChange={handleTyping}
-                    placeholder="Type a message..."
-                    className="custom-scrollbar min-h-11 max-h-32 w-full resize-none bg-transparent px-2 py-3 text-[17px] leading-[22px] text-foreground outline-none placeholder:text-muted-foreground"
+                    placeholder={isSending ? "Sending media..." : "Type a message..."}
+                    disabled={isSending}
+                    className="custom-scrollbar min-h-11 max-h-32 w-full resize-none bg-transparent px-2 py-3 text-[17px] leading-[22px] text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
                     rows={1}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
@@ -1476,15 +1588,19 @@ export function ChatLayout() {
                 </div>
 
                 <AnimatePresence initial={false}>
-                  {(messageText.trim() || selectedFile) && (
+                  {(messageText.trim() || selectedFile || isSending) && (
                     <Motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
                       className="mb-0.5 shrink-0"
                     >
-                      <Button type="submit" size="icon" className="size-10">
-                        <ArrowUp className="size-5" />
+                      <Button type="submit" size="icon" className="size-10" disabled={isSending}>
+                        {isSending ? (
+                          <Loader2 className="size-5 animate-spin" />
+                        ) : (
+                          <ArrowUp className="size-5" />
+                        )}
                       </Button>
                     </Motion.div>
                   )}

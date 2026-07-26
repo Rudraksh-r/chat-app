@@ -52,10 +52,11 @@ const sendMessage = asyncHandler(async (req, res) => {
     }
   }
 
-  // ── Multi-format upload pipeline ─────────────────────────────
+  // ── Multi-format upload pipeline ─────────────────────────────────
   let imageUrl = "";
   let documentData = {};
   let audioData = {};
+  let videoData = {};
 
   if (req.file) {
     const mime = req.file.mimetype;
@@ -67,6 +68,18 @@ const sendMessage = asyncHandler(async (req, res) => {
         transformation: [{ quality: "auto", fetch_format: "auto" }],
       });
       imageUrl = cloudinaryResult.secure_url;
+    } else if (mime.startsWith("video/")) {
+      const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
+        folder: "chat_app/videos",
+        resource_type: "video",
+        transformation: [],
+      });
+      videoData = {
+        url: cloudinaryResult.secure_url,
+        name: req.file.originalname,
+        size: req.file.size,
+        duration: cloudinaryResult.duration || 0,
+      };
     } else if (mime.startsWith("audio/")) {
       const cloudinaryResult = await uploadToCloudinary(req.file.buffer, {
         folder: "chat_app/audio",
@@ -114,6 +127,7 @@ const sendMessage = asyncHandler(async (req, res) => {
       type: "sender_key_distribution",
       keyDistribution,
       image: imageUrl,
+      ...(videoData.url && { video: videoData }),
       ...(audioData.url && { audio: audioData }),
       ...(documentData.url && { document: documentData }),
     };
@@ -150,6 +164,10 @@ const sendMessage = asyncHandler(async (req, res) => {
       iv: iv || "",
       counter: counter ?? null,
       keyVersion: keyVersion ?? null,
+      image: imageUrl,
+      ...(videoData.url && { video: videoData }),
+      ...(audioData.url && { audio: audioData }),
+      ...(documentData.url && { document: documentData }),
     });
 
     await Conversation.findByIdAndUpdate(convoId, {

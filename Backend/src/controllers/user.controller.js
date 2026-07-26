@@ -263,6 +263,35 @@ const getBlockedUsers = asyncHandler(async (req, res) => {
   );
 });
 
+const updateEncryptedPrivateKey = asyncHandler(async (req, res) => {
+  const { encryptedPrivateKey, privateKeyIv, privateKeySalt, publicKey } = req.body;
+
+  if (!encryptedPrivateKey || !privateKeyIv || !privateKeySalt) {
+    throw new ApiError(400, "encryptedPrivateKey, privateKeyIv, and privateKeySalt are required");
+  }
+
+  const updateData = {
+    encryptedPrivateKey,
+    privateKeyIv,
+    privateKeySalt,
+  };
+
+  // If a new public key is provided (keypair regeneration), update it too
+  if (publicKey) {
+    updateData.publicKey = publicKey;
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: updateData },
+    { new: true }
+  ).select('-password -refreshToken');
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, 'Encrypted private key stored successfully'));
+});
+
 export {
   searchUsers,
   updateProfile,
@@ -274,4 +303,5 @@ export {
   blockUser,
   unblockUser,
   getBlockedUsers,
+  updateEncryptedPrivateKey,
 };
