@@ -106,24 +106,7 @@ const useChatStore = create((set, get) => ({
     }
 
     // ── Get their public key ──────────────────────────────────────────────
-    let publicKeyB64 = knownPublicKey;
-    if (!publicKeyB64) {
-      if (publicKeyCache.has(otherUserId)) {
-        publicKeyB64 = publicKeyCache.get(otherUserId);
-      } else {
-        try {
-          const res = await axiosInstance.get(`/user/public-key/${otherUserId}`);
-          publicKeyB64 = res.data.data?.publicKey ?? null;
-          if (publicKeyB64) {
-            publicKeyCache.set(otherUserId, publicKeyB64);
-          }
-        } catch (error) {
-          throw new Error(
-            `Could not fetch public key for user ${otherUserId}: ${error.message}`,
-          );
-        }
-      }
-    }
+    let publicKeyB64 = publicKeyCache.get(otherUserId) || knownPublicKey;
 
     if (!publicKeyB64) {
       for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -143,6 +126,11 @@ const useChatStore = create((set, get) => ({
         } catch {
           // Keep retrying briefly; the peer may still be finishing key setup.
         }
+      }
+    } else {
+      // Ensure we cache the known key so it can be overwritten if it becomes stale
+      if (!publicKeyCache.has(otherUserId)) {
+        publicKeyCache.set(otherUserId, publicKeyB64);
       }
     }
 
