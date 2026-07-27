@@ -36,6 +36,7 @@ import useAuthStore from "../store/authStore";
 import useChatStore from "../store/chatStore";
 import useSocketStore from "../store/socketStore";
 import useThemeStore from "../store/themeStore";
+import { useIsMobile } from "../hooks/use-mobile";
 import { toast } from "sonner";
 import ProfileModal from "../components/ProfileModal";
 import UserInfoModal from "../components/UserInfoModal";
@@ -92,7 +93,7 @@ export function ChatLayout() {
   const getMessageSenderId = (msg) =>
     typeof msg.senderId === "object" ? msg.senderId?._id : msg.senderId;
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const isMobile = useIsMobile();
   const [contextMenuMsgId, setContextMenuMsgId] = useState(null);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editMessageText, setEditMessageText] = useState("");
@@ -263,7 +264,6 @@ export function ChatLayout() {
     await createConversation(userId);
     setSearchQuery("");
     setSearchResults([]);
-    setSidebarOpen(false);
   };
 
   // Handle send message
@@ -502,36 +502,9 @@ export function ChatLayout() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background font-sans text-foreground app-shell">
-      {/* Mobile Sidebar Overlay */}
-      <AnimatePresence>
-        {sidebarOpen && activeConversation && (
-          <Motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/20 md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Sidebar */}
-      <Motion.div
-        drag="x"
-        dragConstraints={{ right: 0 }}
-        dragElastic={0.1}
-        onDragEnd={(e, { offset, velocity }) => {
-          if (offset.x < -100 || velocity.x < -500) {
-            setSidebarOpen(false);
-          }
-        }}
-        initial={false}
-        animate={{ x: sidebarOpen ? 0 : "-100%" }}
-        transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-        style={{ touchAction: "pan-y" }}
-        className="fixed md:relative z-50 flex h-full w-full shrink-0 flex-col bg-sidebar md:w-[360px] md:border-r md:border-sidebar-border md:!transform-none"
-      >
+    <div className="flex h-screen w-full overflow-hidden bg-background font-sans text-foreground app-shell relative">
+      {/* Sidebar - Base Layer */}
+      <div className="relative z-0 flex h-full w-full shrink-0 flex-col bg-sidebar md:w-[360px] md:border-r md:border-sidebar-border">
         {/* Sidebar Header */}
         <div className="px-4 pb-3 pt-6">
           <div className="mb-5 flex min-h-11 items-center justify-between">
@@ -619,7 +592,7 @@ export function ChatLayout() {
                 <div
                   key={user._id}
                   onClick={() => handleStartChat(user._id)}
-                  className="mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-all hover:bg-secondary/60"
+                  className="mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-all hover:bg-secondary/60 active:scale-[0.97] duration-150"
                 >
                   <Avatar
                     src={getAvatarUrl(user)}
@@ -666,10 +639,9 @@ export function ChatLayout() {
                   key={convo._id}
                   onClick={() => {
                     setActiveConversation(convo);
-                    setSidebarOpen(false);
                   }}
                   className={cn(
-                    "group mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-all",
+                    "group mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-all active:scale-[0.97] duration-150",
                     isActive ? "bg-secondary/60" : "hover:bg-secondary/45",
                   )}
                 >
@@ -722,14 +694,32 @@ export function ChatLayout() {
             </div>
           )}
         </div>
-      </Motion.div>
+      </div>
 
       {/* Main Chat Area */}
-      <div className="relative flex min-w-0 flex-1 flex-col bg-background">
-        {activeConversation ? (
-          <>
-            {/* Chat Header */}
-            <Motion.div
+      <AnimatePresence initial={false}>
+        {(!isMobile || activeConversation) && (
+          <Motion.div
+            key="chat-area"
+            initial={isMobile ? { x: "100%" } : false}
+            animate={{ x: 0 }}
+            exit={isMobile ? { x: "100%" } : {}}
+            transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+            drag={isMobile ? "x" : false}
+            dragConstraints={{ left: 0 }}
+            dragElastic={0.1}
+            onDragEnd={(e, { offset, velocity }) => {
+              if (isMobile && (offset.x > 100 || velocity.x > 500)) {
+                setActiveConversation(null);
+              }
+            }}
+            style={isMobile ? { touchAction: "pan-y" } : {}}
+            className="fixed inset-0 z-10 flex min-w-0 flex-col bg-background shadow-2xl md:relative md:flex-1 md:shadow-none md:!transform-none"
+          >
+            {activeConversation ? (
+              <>
+                {/* Chat Header */}
+                <Motion.div
               key={activeConversation?._id}
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
@@ -742,8 +732,8 @@ export function ChatLayout() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="mr-1 -ml-2 text-primary md:hidden"
-                  onClick={() => setSidebarOpen(true)}
+                  className="mr-1 -ml-2 text-primary md:hidden active:scale-[0.97] transition-transform duration-150"
+                  onClick={() => setActiveConversation(null)}
                 >
                   <ChevronLeft className="size-6" />
                 </Button>
@@ -1637,7 +1627,9 @@ export function ChatLayout() {
             </p>
           </div>
         )}
-      </div>
+          </Motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Image Modal */}
       <AnimatePresence>
