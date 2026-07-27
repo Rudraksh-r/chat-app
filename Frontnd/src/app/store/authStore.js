@@ -374,6 +374,25 @@ const useAuthStore = create((set, get) => ({
       set({ isLoading: false });
     }
   },
+  deleteAccount: async () => {
+    set({ isLoading: true });
+    try {
+      await axiosInstance.delete("/user/account");
+      useSocketStore.getState().disconnectSocket();
+      useChatStore.getState().clearChat();
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      set({ authUser: null, needsKeyRestore: false });
+      toast.success("Account deleted successfully");
+      window.location.href = "/register";
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete account");
+      return false;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 }));
 
 export default useAuthStore;

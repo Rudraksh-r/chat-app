@@ -11,6 +11,7 @@ import {
   unblockUser,
   getBlockedUsers,
   updateEncryptedPrivateKey,
+  deleteAccount,
 } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
@@ -44,5 +45,6 @@ router.post("/unblock/:id", verifyJWT, validate(idParamSchema, "params"), unbloc
 // Extended profile routes
 router.get("/:id/profile", verifyJWT, validate(idParamSchema, "params"), getUserProfile);
 router.patch("/profile", verifyJWT, validate(updateProfileDetailsSchema), updateProfileDetails);
+router.delete("/account", verifyJWT, deleteAccount);
 
 export default router;

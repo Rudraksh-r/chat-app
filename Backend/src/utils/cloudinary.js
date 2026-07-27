@@ -50,4 +50,23 @@ export const uploadToCloudinary = (fileBuffer, options = {}) => {
   });
 };
 
+/**
+ * Deletes a file from Cloudinary using its public_id.
+ *
+ * @param {string} public_id - The public ID of the file to delete
+ * @returns {Promise<Object>} - Cloudinary deletion result
+ */
+export const deleteFromCloudinary = async (public_id) => {
+  try {
+    if (!public_id) return null;
+    logger.info("☁️  Starting Cloudinary deletion for: %s", public_id);
+    const result = await cloudinary.uploader.destroy(public_id);
+    logger.info("✅ Cloudinary deletion success: %s", result.result);
+    return result;
+  } catch (error) {
+    logger.error("❌ Cloudinary deletion failed: %s", error.message);
+    return null;
+  }
+};
+
 export default cloudinary;

@@ -37,7 +37,7 @@ const ABOUT_SUGGESTIONS = [
 
 export function Profile() {
   const navigate = useNavigate();
-  const { authUser, logout, updateProfile, updateAvatar, changePassword, isLoading } =
+  const { authUser, logout, updateProfile, updateAvatar, changePassword, deleteAccount, isLoading } =
     useAuthStore();
   const { updateProfileDetails, isLoadingProfile } = useProfileStore();
 
@@ -53,6 +53,8 @@ export function Profile() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+
+  const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
 
   const [isSocialLinksOpen, setIsSocialLinksOpen] = useState(false);
   const [tempSocials, setTempSocials] = useState({
@@ -268,6 +270,16 @@ export function Profile() {
                   <span>Change Password</span>
                 </div>
                 <ChevronRight className="size-4 shrink-0 text-label-secondary" />
+              </GroupedListRow>
+            </GroupedList>
+
+            <GroupedList>
+              <GroupedListRow
+                interactive
+                onClick={() => setIsDeleteAccountOpen(true)}
+                className="justify-center text-destructive"
+              >
+                Delete Account
               </GroupedListRow>
             </GroupedList>
 
@@ -568,6 +580,62 @@ export function Profile() {
                     onChange={(e) => setTempSocials({ ...tempSocials, website: e.target.value })}
                   />
                 </div>
+              </div>
+            </Motion.div>
+          </Motion.div>
+        )}
+
+        {isDeleteAccountOpen && (
+          <Motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 sm:items-center"
+            onClick={() => setIsDeleteAccountOpen(false)}
+          >
+            <Motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              className="glass-thick mb-3 w-full max-w-[420px] overflow-hidden rounded-t-[28px] sm:mb-0 sm:rounded-[28px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-label-tertiary/40" />
+              <div className="hairline flex min-h-12 items-center justify-between px-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary"
+                  onClick={() => setIsDeleteAccountOpen(false)}
+                >
+                  <X className="size-4" />
+                  Cancel
+                </Button>
+                <h2 className="text-[17px] font-semibold leading-[22px] text-destructive">
+                  Delete Account
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="font-semibold text-destructive"
+                  onClick={async () => {
+                    const success = await deleteAccount();
+                    if (success) setIsDeleteAccountOpen(false);
+                  }}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Check className="size-4" />
+                  )}
+                  Delete
+                </Button>
+              </div>
+              <div className="p-5 space-y-4">
+                <p className="text-sm text-label-secondary text-center">
+                  Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your data.
+                </p>
               </div>
             </Motion.div>
           </Motion.div>

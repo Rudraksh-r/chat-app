@@ -3,7 +3,9 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import logger from "../utils/logger.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
-import { uploadToCloudinary } from "../utils/cloudinary.js";
+import { Message } from "../models/message.model.js";
+import { Conversation } from "../models/conversation.model.js";
+import { uploadToCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 import { escapeRegex } from "../utils/escapeRegex.js";
 
 const searchUsers = asyncHandler(async (req, res) => {
@@ -292,6 +294,47 @@ const updateEncryptedPrivateKey = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, 'Encrypted private key stored successfully'));
 });
 
+const deleteAccount = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Delete avatar from Cloudinary
+  if (user.avatar && user.avatar.public_id) {
+    await deleteFromCloudinary(user.avatar.public_id);
+  }
+
+  // Delete all 1-on-1 conversations the user is a part of
+  await Conversation.deleteMany({ isGroupChat: false, members: userId });
+
+  // Remove user from all group chats (members and admins)
+  await Conversation.updateMany(
+    { isGroupChat: true, members: userId },
+    {
+      $pull: { members: userId, groupAdmins: userId }
+    }
+  );
+
+  // Delete all messages sent by the user
+  await Message.deleteMany({ senderId: userId });
+
+  // Delete the user record
+  await User.findByIdAndDelete(userId);
+
+  // Clear cookie to log out
+  res.clearCookie("jwt", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+  });
+
+  return res.status(200).json(new ApiResponse(200, {}, "Account deleted successfully"));
+});
+
 export {
   searchUsers,
   updateProfile,
@@ -304,4 +347,5 @@ export {
   unblockUser,
   getBlockedUsers,
   updateEncryptedPrivateKey,
+  deleteAccount,
 };
