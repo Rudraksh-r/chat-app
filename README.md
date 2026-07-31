@@ -11,7 +11,9 @@ A scalable, production-grade real-time messaging platform inspired by communicat
 - **Typing Indicators**: Real-time "User is typing..." indicators.
 - **Read Receipts & Presence Tracking**: Online/offline tracking, last seen timestamps, and message read statuses.
 
-### User & Security
+### User, Security & E2EE
+- **End-to-End Encryption (E2EE)**: True end-to-end encryption for both 1:1 and Group chats using ECDH key exchange and AES-256-GCM.
+- **Advanced Crypto**: Group chats utilize Sender Key distribution with epoch-based key rotation. Private keys are securely stored locally via IndexedDB and encrypted server-side backups for cross-device sync.
 - **Authentication**: Secure JWT-based authentication with bcrypt password hashing.
 - **User Profiles**: Manage profile avatars, search for other users, and start chats instantly.
 - **Security First**: Implemented with API rate limiting, Helmet for security headers, and secure HTTP-only cookies.
