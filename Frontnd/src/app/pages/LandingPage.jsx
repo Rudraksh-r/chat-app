@@ -475,7 +475,7 @@ export function LandingPage() {
               className="flex flex-wrap gap-6 pt-2"
             >
               {[
-                { label: "100K+", sub: "Users" },
+                { label: "100%", sub: "Open Source" },
                 { label: "256-bit", sub: "AES-GCM" },
                 { label: "0", sub: "Data sold" },
               ].map((stat) => (
@@ -795,7 +795,7 @@ export function LandingPage() {
                 Start messaging privately today
               </h2>
               <p style={{ fontSize: 17, lineHeight: "28px", color: "rgba(255,255,255,0.8)", maxWidth: 440 }}>
-                Join over 100,000 users who've made the switch. Free forever, no credit card required.
+                Join the privacy-first messaging platform. Free forever, no credit card required.
               </p>
               <div className="flex flex-wrap gap-3 justify-center">
                 <button
