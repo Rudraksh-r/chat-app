@@ -36,7 +36,7 @@ export default function UserInfoModal({ profile, onClose }) {
           <div className="relative h-32 bg-gradient-to-tr from-primary/30 to-accent/20 flex items-center justify-center">
             <button
               onClick={onClose}
-              className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-md transition-all hover:bg-black/40 hover:scale-105"
+              className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-md transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 hover:bg-black/40 active:scale-[0.97]"
             >
               <X className="size-4" />
             </button>
@@ -98,7 +98,7 @@ export default function UserInfoModal({ profile, onClose }) {
                       href={socialLinks.github}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-all text-sm font-medium text-foreground cursor-pointer"
+                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 text-sm font-medium text-foreground cursor-pointer"
                     >
                       <Github className="size-4 text-label-secondary" />
                       <span>GitHub</span>
@@ -109,7 +109,7 @@ export default function UserInfoModal({ profile, onClose }) {
                       href={socialLinks.linkedin}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-all text-sm font-medium text-foreground cursor-pointer"
+                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 text-sm font-medium text-foreground cursor-pointer"
                     >
                       <Linkedin className="size-4 text-label-secondary" />
                       <span>LinkedIn</span>
@@ -120,7 +120,7 @@ export default function UserInfoModal({ profile, onClose }) {
                       href={socialLinks.twitter}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-all text-sm font-medium text-foreground cursor-pointer"
+                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 text-sm font-medium text-foreground cursor-pointer"
                     >
                       <Twitter className="size-4 text-label-secondary" />
                       <span>Twitter / X</span>
@@ -131,7 +131,7 @@ export default function UserInfoModal({ profile, onClose }) {
                       href={socialLinks.instagram}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-all text-sm font-medium text-foreground cursor-pointer"
+                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 text-sm font-medium text-foreground cursor-pointer"
                     >
                       <Instagram className="size-4 text-label-secondary" />
                       <span>Instagram</span>
@@ -142,7 +142,7 @@ export default function UserInfoModal({ profile, onClose }) {
                       href={socialLinks.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-all text-sm font-medium text-foreground cursor-pointer col-span-2 justify-center"
+                      className="flex items-center gap-2 px-3 py-2 bg-secondary/40 rounded-xl hover:bg-secondary/75 hover:scale-[1.02] transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 text-sm font-medium text-foreground cursor-pointer col-span-2 justify-center"
                     >
                       <Globe className="size-4 text-label-secondary" />
                       <span>Website</span>

@@ -88,7 +88,7 @@ export default function ThemePicker({ chatId, onClose }) {
             </h2>
             <button
               onClick={onClose}
-              className="flex size-7 items-center justify-center rounded-full bg-secondary/60 text-foreground transition-all hover:bg-secondary hover:scale-105 cursor-pointer"
+              className="flex size-7 items-center justify-center rounded-full bg-secondary/60 text-foreground transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 hover:bg-secondary active:scale-[0.97] cursor-pointer"
             >
               <X className="size-4" />
             </button>
@@ -103,7 +103,7 @@ export default function ThemePicker({ chatId, onClose }) {
                   onClick={() => {
                     setChatTheme(chatId, themeKey);
                   }}
-                  className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all hover:scale-[1.02] border ${
+                  className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 hover:scale-[1.02] border ${
                     isActive
                       ? "border-primary bg-primary/10"
                       : "border-border/30 bg-secondary/35 hover:bg-secondary/60"

@@ -73,7 +73,7 @@ export default function ProfileModal({ userId, onClose, onOpenInfo }) {
           <div className="relative h-24 bg-gradient-to-tr from-primary/30 to-accent/20">
             <button
               onClick={onClose}
-              className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-md transition-all hover:bg-black/40 hover:scale-105"
+              className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-md transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 hover:bg-black/40 active:scale-[0.97]"
             >
               <X className="size-4" />
             </button>
@@ -119,7 +119,7 @@ export default function ProfileModal({ userId, onClose, onOpenInfo }) {
                           href={socialLinks.github}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-primary transition-colors hover:scale-105"
+                          className="hover:text-primary transition-colors active:scale-[0.97]"
                         >
                           <Github className="size-5" />
                         </a>
@@ -129,7 +129,7 @@ export default function ProfileModal({ userId, onClose, onOpenInfo }) {
                           href={socialLinks.linkedin}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-primary transition-colors hover:scale-105"
+                          className="hover:text-primary transition-colors active:scale-[0.97]"
                         >
                           <Linkedin className="size-5" />
                         </a>
@@ -139,7 +139,7 @@ export default function ProfileModal({ userId, onClose, onOpenInfo }) {
                           href={socialLinks.twitter}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-primary transition-colors hover:scale-105"
+                          className="hover:text-primary transition-colors active:scale-[0.97]"
                         >
                           <Twitter className="size-5" />
                         </a>
@@ -149,7 +149,7 @@ export default function ProfileModal({ userId, onClose, onOpenInfo }) {
                           href={socialLinks.instagram}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-primary transition-colors hover:scale-105"
+                          className="hover:text-primary transition-colors active:scale-[0.97]"
                         >
                           <Instagram className="size-5" />
                         </a>
@@ -159,7 +159,7 @@ export default function ProfileModal({ userId, onClose, onOpenInfo }) {
                           href={socialLinks.website}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-primary transition-colors hover:scale-105"
+                          className="hover:text-primary transition-colors active:scale-[0.97]"
                         >
                           <Globe className="size-5" />
                         </a>

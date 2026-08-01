@@ -369,7 +369,7 @@ export function Profile() {
                             key={suggestion}
                             type="button"
                             onClick={() => setEditingValue(suggestion)}
-                            className="text-xs px-2.5 py-1.5 rounded-full border border-border bg-card text-foreground hover:bg-secondary transition-all cursor-pointer text-left"
+                            className="text-xs px-2.5 py-1.5 rounded-full border border-border bg-card text-foreground hover:bg-secondary transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 cursor-pointer text-left"
                           >
                             {suggestion}
                           </button>

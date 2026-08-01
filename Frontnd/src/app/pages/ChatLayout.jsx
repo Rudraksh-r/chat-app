@@ -592,7 +592,7 @@ export function ChatLayout() {
                 <div
                   key={user._id}
                   onClick={() => handleStartChat(user._id)}
-                  className="mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-all hover:bg-secondary/60 active:scale-[0.97] duration-150"
+                  className="mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 hover:bg-secondary/60 active:scale-[0.97] duration-150"
                 >
                   <Avatar
                     src={getAvatarUrl(user)}
@@ -641,7 +641,7 @@ export function ChatLayout() {
                     setActiveConversation(convo);
                   }}
                   className={cn(
-                    "group mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-all active:scale-[0.97] duration-150",
+                    "group mx-2 flex min-h-[76px] cursor-pointer items-center gap-3 rounded-2xl px-3 transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 active:scale-[0.97] duration-150",
                     isActive ? "bg-secondary/60" : "hover:bg-secondary/45",
                   )}
                 >
@@ -997,7 +997,7 @@ export function ChatLayout() {
                               {/* Floating Reaction Menu */}
                               <div
                                 className={cn(
-                                  "glass absolute -top-10 z-20 hidden gap-1 rounded-full p-1.5 transition-all group-hover:flex",
+                                  "glass absolute -top-10 z-20 hidden gap-1 rounded-full p-1.5 transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 group-hover:flex",
                                   isMe ? "right-0" : "left-0",
                                 )}
                               >
@@ -1232,7 +1232,7 @@ export function ChatLayout() {
                                         sendToggleReaction(msg._id, emoji)
                                       }
                                       className={cn(
-                                        "flex cursor-pointer items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-[13px] transition-all hover:scale-105",
+                                        "flex cursor-pointer items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-[13px] transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 active:scale-[0.97]",
                                         hasReacted
                                           ? "border-primary/40 bg-primary/15 text-primary"
                                           : "border-border bg-card text-foreground hover:bg-secondary/70",
@@ -1539,7 +1539,7 @@ export function ChatLayout() {
                   <CirclePlus className="size-6" />
                 </Button>
 
-                <div className="relative flex flex-1 items-end rounded-[22px] transition-all focus-within:ring-2 focus-within:ring-primary/20">
+                <div className="relative flex flex-1 items-end rounded-[22px] transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 focus-within:ring-2 focus-within:ring-primary/20">
                   <Button
                     type="button"
                     variant="ghost"
@@ -1724,7 +1724,7 @@ export function ChatLayout() {
                     placeholder="e.g. Project Avengers 🚀"
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value)}
-                    className="min-h-11 w-full rounded-2xl border-0 bg-input-background px-4 py-3 text-[17px] leading-[22px] text-foreground outline-none transition-all placeholder:text-muted-foreground focus:bg-input focus:ring-2 focus:ring-primary/50"
+                    className="min-h-11 w-full rounded-2xl border-0 bg-input-background px-4 py-3 text-[17px] leading-[22px] text-foreground outline-none transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 placeholder:text-muted-foreground focus:bg-input focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
 
@@ -1780,7 +1780,7 @@ export function ChatLayout() {
                       placeholder="Search users..."
                       value={groupSearchQuery}
                       onChange={(e) => setGroupSearchQuery(e.target.value)}
-                      className="h-11 w-full rounded-full border-0 bg-secondary/70 pl-10 pr-4 text-[17px] leading-[22px] text-foreground outline-none transition-all placeholder:text-muted-foreground focus:bg-input focus:ring-2 focus:ring-primary/40"
+                      className="h-11 w-full rounded-full border-0 bg-secondary/70 pl-10 pr-4 text-[17px] leading-[22px] text-foreground outline-none transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 placeholder:text-muted-foreground focus:bg-input focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
                 </div>
@@ -1814,7 +1814,7 @@ export function ChatLayout() {
                             }
                           }}
                           className={cn(
-                            "flex min-h-[58px] cursor-pointer items-center justify-between rounded-2xl px-3 transition-all",
+                            "flex min-h-[58px] cursor-pointer items-center justify-between rounded-2xl px-3 transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200",
                             isSelected
                               ? "bg-primary/10"
                               : "hover:bg-secondary/60",
@@ -1840,7 +1840,7 @@ export function ChatLayout() {
 
                           <div
                             className={cn(
-                              "flex size-5 shrink-0 items-center justify-center rounded-full border transition-all",
+                              "flex size-5 shrink-0 items-center justify-center rounded-full border transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200",
                               isSelected
                                 ? "border-primary bg-primary text-primary-foreground"
                                 : "border-border",

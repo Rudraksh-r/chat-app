@@ -8,7 +8,7 @@ export const SearchField = React.forwardRef(({ className, ...props }, ref) => (
     <input
       ref={ref}
       type="search"
-      className="h-11 w-full rounded-full border-0 bg-secondary/70 pl-10 pr-4 text-[17px] leading-[22px] text-foreground outline-none transition-all placeholder:text-muted-foreground focus:bg-input focus:ring-2 focus:ring-primary/40"
+      className="h-11 w-full rounded-full border-0 bg-secondary/70 pl-10 pr-4 text-[17px] leading-[22px] text-foreground outline-none transition-[transform,opacity,background-color,border-color,color] ease-[var(--ease-out)] duration-200 placeholder:text-muted-foreground focus:bg-input focus:ring-2 focus:ring-primary/40"
       {...props}
     />
   </div>
