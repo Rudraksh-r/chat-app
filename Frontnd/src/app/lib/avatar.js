@@ -9,6 +9,7 @@
  */
 export const getAvatarUrl = (user) => {
   if (!user) return getDefaultAvatar("?");
+  if (user.username === "aura_ai" || user.email === "ai@meta.bot") return "/aura-avatar.png";
 
   // New shape: avatar is an object with a url property
   if (user.avatar?.url) return user.avatar.url;

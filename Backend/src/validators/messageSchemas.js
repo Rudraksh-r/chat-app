@@ -13,9 +13,9 @@ export const sendMessageSchema = z
     convoId: objectIdString("convoId"),
 
     type: z
-      .enum(["text", "sender_key_distribution"], {
+      .enum(["text", "sender_key_distribution", "ai_text"], {
         errorMap: () => ({
-          message: 'type must be either "text" or "sender_key_distribution"',
+          message: 'type must be either "text", "sender_key_distribution", or "ai_text"',
         }),
       })
       .default("text"),
@@ -23,6 +23,10 @@ export const sendMessageSchema = z
     ciphertext: z
       .string()
       .regex(BASE64_PATTERN, { message: "ciphertext must be valid base64" })
+      .optional(),
+      
+    plaintext: z
+      .string()
       .optional(),
 
     iv: z
@@ -65,6 +69,14 @@ export const sendMessageSchema = z
         code: z.ZodIssueCode.custom,
         path: ["ciphertext"],
         message: "ciphertext is required when type is \"text\"",
+      });
+    }
+
+    if (data.type === "ai_text" && !data.plaintext) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["plaintext"],
+        message: "plaintext is required when type is \"ai_text\"",
       });
     }
 

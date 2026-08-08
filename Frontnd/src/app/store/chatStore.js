@@ -200,6 +200,10 @@ const useChatStore = create((set, get) => ({
   },
 
   decryptOneToOneMessage: async (message, otherUserId) => {
+    if (message.type === "ai_text") {
+      return { ...message, decryptedText: message.plaintext };
+    }
+    
     try {
       const sharedKey = await get().getSharedKey(otherUserId);
       const plaintext = await decryptMessage(
@@ -754,15 +758,19 @@ sendMessage: async (text, file = null) => {
 
       if (!otherUser) throw new Error("Cannot identify recipient");
 
-      const otherId = (otherUser._id ?? otherUser).toString();
-      const sharedKey = await get().getSharedKey(
-        otherId,
-        otherUser.publicKey ?? null,
-      );
+      // AI Bot Bypass
+      if (otherUser.email === "ai@meta.bot" || otherUser.username === "aura_ai") {
+        payload = { type: "ai_text", plaintext };
+      } else {
+        const otherId = (otherUser._id ?? otherUser).toString();
+        const sharedKey = await get().getSharedKey(
+          otherId,
+          otherUser.publicKey ?? null,
+        );
 
-      const { ciphertext, iv } = await encryptMessage(plaintext, sharedKey);
-
-      payload = { type: "text", ciphertext, iv };
+        const { ciphertext, iv } = await encryptMessage(plaintext, sharedKey);
+        payload = { type: "text", ciphertext, iv };
+      }
     }
 
     let res;
@@ -771,7 +779,8 @@ sendMessage: async (text, file = null) => {
       const formData = new FormData();
       formData.append("convoId", activeConversation._id.toString());
       formData.append("type", payload.type);
-      formData.append("ciphertext", payload.ciphertext);
+      if (payload.ciphertext) formData.append("ciphertext", payload.ciphertext);
+      if (payload.plaintext) formData.append("plaintext", payload.plaintext);
 
       if (payload.iv) {
         formData.append("iv", payload.iv);

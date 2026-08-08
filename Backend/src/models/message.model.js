@@ -14,7 +14,7 @@ const messageSchema = new Schema(
     },
     type: {
       type: String,
-      enum: ["text", "sender_key_distribution"],
+      enum: ["text", "sender_key_distribution", "ai_text"],
       default: "text",
     },
     ciphertext: {
@@ -22,6 +22,12 @@ const messageSchema = new Schema(
       required: function () {
         return this.type === "text";
       },
+    },
+    plaintext: {
+      type: String,
+      required: function () {
+        return this.type === "ai_text";
+      }
     },
     image: {
       type: String,

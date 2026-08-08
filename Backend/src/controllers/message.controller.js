@@ -7,6 +7,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { getReceiverSocketIds, io } from "../socket/socket.js";
 import { SOCKET_EVENTS } from "../socket/events.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
+import { aiService } from "../services/ai.service.js";
 
 const sendMessage = asyncHandler(async (req, res) => {
   // req.body is already validated by sendMessageSchema (convoId, type, ciphertext, iv, counter, keyVersion, etc.)
@@ -14,6 +15,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     convoId,
     type = "text",
     ciphertext,
+    plaintext,
     iv,
     counter,
     keyVersion,
@@ -141,7 +143,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     }
 
     message = await Message.create(messageData);
-  } else {
+  } else if (type === "text") {
     if (!ciphertext) {
       throw new ApiError(400, "ciphertext is required");
     }
@@ -173,6 +175,22 @@ const sendMessage = asyncHandler(async (req, res) => {
     await Conversation.findByIdAndUpdate(convoId, {
       lastMessage: "[Encrypted]",
     });
+  } else if (type === "ai_text") {
+    if (!plaintext) {
+      throw new ApiError(400, "plaintext is required for ai_text");
+    }
+    
+    message = await Message.create({
+      convoId,
+      senderId,
+      type: "ai_text",
+      plaintext,
+      image: imageUrl,
+    });
+    
+    await Conversation.findByIdAndUpdate(convoId, {
+      lastMessage: plaintext,
+    });
   }
 
   const otherMembers = convoExists.members.filter(
@@ -193,6 +211,12 @@ const sendMessage = asyncHandler(async (req, res) => {
     targetSocketIds.forEach((socketId) => {
       io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_RECEIVE, message);
     });
+  }
+
+  // AI Bot Integration
+  if (global.AI_BOT_ID && otherMembers.some(m => m.toString() === global.AI_BOT_ID)) {
+    // We don't await this to keep the API response fast
+    handleAIResponse(convoId, plaintext, senderId);
   }
 
   return res
@@ -487,6 +511,51 @@ const toggleReaction = asyncHandler(async (req, res) => {
       ),
     );
 });
+const handleAIResponse = async (convoId, userText, userId) => {
+  try {
+    const aiBotId = global.AI_BOT_ID;
+    if (!aiBotId) return;
+
+    // Fetch conversation history
+    const pastMessages = await Message.find({ convoId })
+      .sort({ createdAt: -1 })
+      .limit(10); // get last 10 messages for context
+      
+    pastMessages.reverse();
+
+    const history = pastMessages
+      .filter(m => m.type === "ai_text" && m.plaintext) // Only consider ai_text messages for context
+      .map(m => ({
+        role: m.senderId.toString() === aiBotId ? "assistant" : "user",
+        content: m.plaintext
+      }));
+
+    // Generate AI response
+    const aiResponseText = await aiService.getResponse(userText, history);
+
+    // Save AI response to DB
+    const aiMessage = await Message.create({
+      convoId,
+      senderId: aiBotId,
+      type: "ai_text",
+      plaintext: aiResponseText,
+    });
+
+    await Conversation.findByIdAndUpdate(convoId, {
+      lastMessage: aiResponseText,
+    });
+
+    // Send back to the user via Socket
+    const targetSocketIds = getReceiverSocketIds(userId.toString());
+    targetSocketIds.forEach((socketId) => {
+      io.to(socketId).emit(SOCKET_EVENTS.MESSAGE_RECEIVE, aiMessage);
+    });
+
+  } catch (error) {
+    console.error("Error in handleAIResponse:", error);
+  }
+};
+
 export {
   sendMessage,
   getMessage,

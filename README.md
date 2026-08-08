@@ -23,6 +23,12 @@ A scalable, production-grade real-time messaging platform inspired by communicat
 - **Smooth Animations**: High-quality micro-interactions and transitions using `motion/react` (Framer Motion).
 - **Fully Responsive**: Works seamlessly across desktop, tablet, and mobile devices.
 
+### AI Integration (Aura)
+- **Smart AI Chatbot**: Built-in conversational AI assistant ("Aura") using the Groq API for lightning-fast responses (Llama 3 model).
+- **Rich Message Formatting**: Supports markdown rendering (bold text, lists) within chat bubbles.
+- **Dynamic UI Enhancements**: Custom glowing radial background and dedicated floating action button for chatting with Aura.
+- **Secure E2EE Bypass**: Secure backend routing allows AI messages to bypass strict E2EE while keeping standard chats fully encrypted.
+
 ## 🛠️ Tech Stack
 
 ### Frontend
@@ -95,6 +101,9 @@ NODE_ENV=development
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+# AI Setup
+GROQ_API_KEY=your_groq_api_key
 ```
 
 Start the backend server:

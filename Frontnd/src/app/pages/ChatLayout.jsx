@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
+import ReactMarkdown from 'react-markdown';
 import {
   ArrowUp,
   ChevronLeft,
@@ -153,7 +154,9 @@ export function ChatLayout() {
   // Compute active chat theme styles
   const activeChatThemeKey = activeConversation?._id ? (chatThemes[activeConversation._id] || 'default') : 'default';
   const activeChatThemeConfig = CHAT_THEMES[activeChatThemeKey] || CHAT_THEMES.default;
-  const activeChatStyle = activeChatThemeKey !== 'default' ? {
+  
+  const isAuraChat = !activeConversation?.isGroupChat && activeConversation?.members?.some(m => m.username === "aura_ai" || m.email === "ai@meta.bot");
+  let activeChatStyle = activeChatThemeKey !== 'default' ? {
     background: activeChatThemeConfig.wallpaper && activeChatThemeConfig.wallpaper !== 'none'
       ? activeChatThemeConfig.wallpaper
       : activeChatThemeConfig.backgroundColor,
@@ -162,6 +165,13 @@ export function ChatLayout() {
     '--bubble-sent-foreground': '#FFFFFF',
     '--bubble-received-foreground': '#FFFFFF',
   } : {};
+
+  if (isAuraChat) {
+    activeChatStyle = {
+      ...activeChatStyle,
+      background: 'radial-gradient(circle at center, rgba(147, 51, 234, 0.15) 0%, rgba(79, 70, 229, 0.05) 50%, transparent 100%)',
+    };
+  }
 
   useEffect(() => {
     const updateCurrentTime = () => setCurrentTime(Date.now());
@@ -404,7 +414,7 @@ export function ChatLayout() {
 
   const isOtherOnline =
     !activeConversation?.isGroupChat && otherUser
-      ? isUserOnline(otherUser._id)
+      ? ((otherUser.username === "aura_ai" || otherUser.email === "ai@meta.bot") || isUserOnline(otherUser._id))
       : false;
 
   const isOtherTyping = activeConversation
@@ -632,7 +642,7 @@ export function ChatLayout() {
                 ? convo.groupAvatar ||
                   getAvatarUrl({ fullName: convo.groupName })
                 : getAvatarUrl(other);
-              const online = !isGroup && isUserOnline(other?._id);
+              const online = !isGroup && (other?.username === "aura_ai" || other?.email === "ai@meta.bot" || isUserOnline(other?._id));
 
               return (
                 <div
@@ -694,6 +704,30 @@ export function ChatLayout() {
             </div>
           )}
         </div>
+
+        {/* Floating Aura Button */}
+        <button
+          onClick={async () => {
+            const aiBot = onlineUsers.find(u => u === "ai_bot_placeholder") || { _id: "aura_ai", username: "aura_ai", email: "ai@meta.bot", fullName: "Aura" };
+            let convo = conversations.find(c => !c.isGroupChat && c.members.some(m => m.username === "aura_ai" || m.email === "ai@meta.bot"));
+            
+            if (convo) {
+              setActiveConversation(convo);
+            } else {
+              try {
+                toast.error("Please search for 'Aura' to start the chat for the first time.");
+              } catch (err) {
+                toast.error("Aura is currently unavailable.");
+              }
+            }
+          }}
+          className="absolute bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-purple-500 text-white shadow-[0_4px_20px_rgba(79,70,229,0.4)] hover:scale-105 active:scale-95 transition-all duration-200 ease-out group"
+        >
+          <span className="text-xl font-bold">AI</span>
+          <span className="absolute -top-10 right-0 w-max opacity-0 transition-opacity group-hover:opacity-100 bg-foreground text-background text-xs px-2 py-1 rounded shadow-md pointer-events-none">
+            Chat with Aura
+          </span>
+        </button>
       </div>
 
       {/* Main Chat Area */}
@@ -1190,10 +1224,18 @@ export function ChatLayout() {
                                   </div>
                                 </div>
                               ) : (msg.type === "text" || msg.decryptedText != null) ? (
-                                <div className="flex flex-col">
-                                  <p className="break-words text-[17px] leading-[22px]">
+                                <div className="break-words text-[17px] leading-[22px] max-w-full overflow-hidden prose prose-invert prose-p:leading-snug prose-p:mb-2 prose-ul:mb-2 prose-ol:mb-2 prose-li:mb-1">
+                                  <ReactMarkdown
+                                    components={{
+                                      p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                                      strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                                      ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+                                      ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+                                      li: ({node, ...props}) => <li {...props} />
+                                    }}
+                                  >
                                     {msg.decryptedText ?? msg.text ?? "[Unable to decrypt]"}
-                                  </p>
+                                  </ReactMarkdown>
                                   {msg.isEdited && (
                                     <span className="text-[10px] opacity-70 mt-0.5">
                                       (edited)
@@ -2187,7 +2229,7 @@ export function ChatLayout() {
           onClose={() => setShowThemePicker(false)}
         />
       )}
-      <style jsx>{`
+      <style jsx="true">{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }

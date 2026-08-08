@@ -27,6 +27,7 @@ import "./app.js"; // This MUST be imported so the routes attach to the app inst
 import { server } from "./socket/socket.js";
 import logger from "./utils/logger.js";
 import mongoose from "mongoose";
+import { setupAIBot } from "./utils/setupAIBot.js";
 
 // --- PROCESS ERROR HANDLERS ---
 process.on("unhandledRejection", (reason, promise) => {
@@ -43,6 +44,7 @@ process.on("uncaughtException", (error) => {
 const listen = async () => {
     try {
         await connectDB()
+        await setupAIBot()
 
         const port = process.env.PORT || 5001;
         server.listen(port, () => {
