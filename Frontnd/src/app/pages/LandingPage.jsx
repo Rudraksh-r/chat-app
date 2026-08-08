@@ -1,862 +1,558 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "motion/react";
+import { motion, useMotionValue, useTransform, useSpring, AnimatePresence } from "motion/react";
 import {
   Lock,
   MessageCircle,
   Zap,
   Shield,
   Users,
-  ArrowUp,
+  ArrowRight,
   ChevronRight,
   CheckCheck,
   Smile,
   CirclePlus,
-  SquarePen,
   Search,
   Moon,
   Sun,
+  Fingerprint,
+  Sparkles
 } from "lucide-react";
 
-const springDefault = { type: "spring", bounce: 0, duration: 0.4 };
-const springSnappy = { type: "spring", bounce: 0.2, duration: 0.4 };
+// ── Shared Animation Config ──
+const springConfig = { type: "spring", bounce: 0, duration: 0.4 };
+const transitionSnap = { type: "spring", bounce: 0, duration: 0.4 };
 
-// ── Mock chat messages for the hero preview ──
+// ── Mock Data for Hero ──
 const mockMessages = [
-  { id: 1, sender: "Alice", text: "Hey! Did you see the new design?", time: "10:41 AM", sent: false },
-  { id: 2, sender: "Me", text: "Just checked it — looks incredible 🔥", time: "10:42 AM", sent: true },
-  { id: 3, sender: "Alice", text: "Right? The glass effects are so smooth", time: "10:42 AM", sent: false },
-  { id: 4, sender: "Me", text: "Ship it!", time: "10:43 AM", sent: true },
+  { id: 1, sender: "Alice", text: "Did you see the new Cipher update?", time: "10:41 AM", sent: false },
+  { id: 2, sender: "Me", text: "Yes! The design is absolutely stunning ✨", time: "10:42 AM", sent: true },
+  { id: 3, sender: "Alice", text: "And it's E2E encrypted by default.", time: "10:42 AM", sent: false },
+  { id: 4, sender: "Me", text: "Privacy + Aesthetics = 🚀", time: "10:43 AM", sent: true },
 ];
 
 const features = [
   {
-    icon: Lock,
-    title: "End-to-End Encrypted",
-    description: "Every message is encrypted on your device. Not even we can read your conversations.",
-    color: "#007AFF",
+    icon: Fingerprint,
+    title: "Military-Grade Encryption",
+    description: "Your keys never leave your device. AES-256-GCM encryption secures every byte.",
+    color: "#6366f1", // Indigo
   },
   {
     icon: Zap,
-    title: "Real-Time Messaging",
-    description: "Messages arrive instantly over WebSocket connections. No polling, no delays.",
-    color: "#34C759",
+    title: "Instant Delivery",
+    description: "Built on WebSockets for zero-latency communication. Feel the speed.",
+    color: "#10b981", // Emerald
   },
   {
     icon: Users,
-    title: "Group Conversations",
-    description: "Create groups for teams, friends, or family. Full E2EE for every member.",
-    color: "#FF9F0A",
+    title: "Secure Groups",
+    description: "Collaborate securely with groups. Perfect for teams who demand privacy.",
+    color: "#f59e0b", // Amber
   },
   {
     icon: Shield,
-    title: "Zero Data Collection",
-    description: "We store only what's needed to route your messages. No ads, no profiling.",
-    color: "#BF5AF2",
+    title: "Zero Metadata",
+    description: "We don't know who you talk to, when you talk, or what you say. Period.",
+    color: "#d946ef", // Fuchsia
+  },
+  {
+    icon: Sparkles,
+    title: "Fluid Interface",
+    description: "A gorgeous, responsive UI packed with micro-animations and delight.",
+    color: "#ec4899", // Pink
   },
   {
     icon: MessageCircle,
-    title: "Reactions & Tapbacks",
-    description: "React to messages with emoji tapbacks, just like you're used to.",
-    color: "#FF375F",
-  },
-  {
-    icon: CheckCheck,
-    title: "Read Receipts",
-    description: "Know when your message was delivered and seen, with clear visual indicators.",
-    color: "#32ADE6",
+    title: "Expressive Chat",
+    description: "Reactions, read receipts, and rich media — without sacrificing security.",
+    color: "#3b82f6", // Blue
   },
 ];
 
-function ChatPreview() {
-  const [visibleMessages, setVisibleMessages] = useState([]);
-  const [inputText, setInputText] = useState("");
-  const [showSend, setShowSend] = useState(false);
+// ── Components ──
 
-  useEffect(() => {
-    mockMessages.forEach((msg, i) => {
-      setTimeout(() => {
-        setVisibleMessages((prev) => [...prev, msg.id]);
-      }, 600 + i * 700);
-    });
-  }, []);
-
-  useEffect(() => {
-    setShowSend(inputText.length > 0);
-  }, [inputText]);
-
+function MeshBackground({ dark }) {
   return (
-    <div className="relative w-full max-w-sm mx-auto" style={{ height: 520 }}>
-      {/* Phone frame */}
-      <div
-        className="absolute inset-0 rounded-[44px] overflow-hidden shadow-2xl"
-        style={{ background: "#F2F2F7", border: "1px solid rgba(0,0,0,0.08)" }}
-      >
-        {/* Chat header */}
-        <div
-          className="glass flex items-center gap-3 px-4 pt-12 pb-3"
-          style={{ borderBottom: "0.5px solid rgba(0,0,0,0.08)" }}
-        >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
-            <span style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>A</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p style={{ fontSize: 17, fontWeight: 600, lineHeight: "22px", color: "#000" }}>Alice</p>
-            <p style={{ fontSize: 12, color: "#34C759", fontWeight: 500 }}>● Online</p>
-          </div>
-          <Search size={18} strokeWidth={1.75} color="#007AFF" />
-        </div>
-
-        {/* Messages */}
-        <div className="flex flex-col gap-2 px-4 py-3" style={{ paddingBottom: 80 }}>
-          {mockMessages.map((msg) =>
-            visibleMessages.includes(msg.id) ? (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={springSnappy}
-                className={`flex flex-col ${msg.sent ? "items-end" : "items-start"}`}
-              >
-                <div
-                  className="px-4 py-2 max-w-[75%]"
-                  style={{
-                    borderRadius: 18,
-                    background: msg.sent ? "#007AFF" : "#E9E9EB",
-                    color: msg.sent ? "#fff" : "#000",
-                    fontSize: 17,
-                    lineHeight: "22px",
-                  }}
-                >
-                  {msg.text}
-                </div>
-                <div style={{ fontSize: 11, color: "#AEAEB2", marginTop: 2, paddingLeft: 4, paddingRight: 4 }}>
-                  {msg.time}
-                  {msg.sent && (
-                    <CheckCheck size={11} strokeWidth={1.75} color="#007AFF" style={{ display: "inline", marginLeft: 4 }} />
-                  )}
-                </div>
-              </motion.div>
-            ) : null
-          )}
-
-          {/* Typing indicator */}
-          {visibleMessages.length === 3 && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={springSnappy}
-              className="flex items-start"
-            >
-              <div
-                className="px-4 py-3 flex gap-1 items-center"
-                style={{ borderRadius: 18, background: "#E9E9EB" }}
-              >
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="w-2 h-2 rounded-full"
-                    style={{ background: "#8E8E93" }}
-                    animate={{ y: [0, -4, 0] }}
-                    transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
-                  />
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </div>
-
-        {/* Compose bar */}
-        <div
-          className="glass absolute bottom-0 left-0 right-0 flex items-center gap-2 px-3 py-3"
-          style={{ borderTop: "0.5px solid rgba(255,255,255,0.6)" }}
-        >
-          <button className="w-8 h-8 flex items-center justify-center" style={{ color: "#007AFF" }}>
-            <CirclePlus size={22} strokeWidth={1.75} />
-          </button>
-          <div
-            className="flex-1 flex items-center px-4"
-            style={{
-              background: "rgba(142,142,147,0.12)",
-              borderRadius: 999,
-              height: 36,
-            }}
-          >
-            <input
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="iMessage"
-              style={{
-                background: "transparent",
-                border: "none",
-                outline: "none",
-                fontSize: 17,
-                lineHeight: "22px",
-                color: "#000",
-                width: "100%",
-              }}
-              className="placeholder:text-muted-foreground"
-            />
-          </div>
-          <motion.button
-            animate={{ scale: showSend ? 1 : 0.95, opacity: showSend ? 1 : 0 }}
-            transition={springSnappy}
-            className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: "#007AFF" }}
-          >
-            <ArrowUp size={16} strokeWidth={2.5} color="#fff" />
-          </motion.button>
-          {!showSend && (
-            <button style={{ color: "#007AFF" }}>
-              <Smile size={22} strokeWidth={1.75} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Notch */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-1/2"
+    <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+      <div className="absolute inset-0 transition-colors duration-700 bg-background" />
+      
+      {/* Primary Orb */}
+      <motion.div
+        animate={{
+          scale: [1, 1.2, 1],
+          x: [0, 50, 0],
+          y: [0, 30, 0],
+        }}
+        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-[-10%] right-[-5%]"
         style={{
-          width: 120,
-          height: 36,
-          background: "#000",
-          borderBottomLeftRadius: 20,
-          borderBottomRightRadius: 20,
-          zIndex: 10,
+          width: '60vw',
+          height: '60vw',
+          background: dark 
+            ? 'radial-gradient(circle, rgba(10,132,255,0.15) 0%, transparent 60%)' 
+            : 'radial-gradient(circle, rgba(0,122,255,0.2) 0%, transparent 60%)',
+          filter: 'blur(80px)',
+          borderRadius: '50%',
+        }}
+      />
+      
+      {/* Secondary Orb */}
+      <motion.div
+        animate={{
+          scale: [1, 1.3, 1],
+          x: [0, -40, 0],
+          y: [0, -50, 0],
+        }}
+        transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        className="absolute bottom-[-20%] left-[-10%]"
+        style={{
+          width: '50vw',
+          height: '50vw',
+          background: dark 
+            ? 'radial-gradient(circle, rgba(10,132,255,0.1) 0%, transparent 60%)' 
+            : 'radial-gradient(circle, rgba(0,122,255,0.15) 0%, transparent 60%)',
+          filter: 'blur(90px)',
+          borderRadius: '50%',
+        }}
+      />
+
+      {/* Tertiary Orb */}
+      <motion.div
+        animate={{
+          scale: [1, 1.1, 1],
+          x: [0, 30, 0],
+          y: [0, -40, 0],
+        }}
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 5 }}
+        className="absolute top-[30%] left-[20%]"
+        style={{
+          width: '40vw',
+          height: '40vw',
+          background: dark 
+            ? 'radial-gradient(circle, rgba(10,132,255,0.08) 0%, transparent 60%)' 
+            : 'radial-gradient(circle, rgba(0,122,255,0.12) 0%, transparent 60%)',
+          filter: 'blur(100px)',
+          borderRadius: '50%',
         }}
       />
     </div>
   );
 }
 
-function FeatureCard({ icon: Icon, title, description, color, index }) {
+function HeroMockup({ dark }) {
+  const [visibleMessages, setVisibleMessages] = useState([]);
+  
+  // 3D Tilt Effect
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  
+  const rotateX = useSpring(useTransform(mouseY, [-300, 300], [8, -8]), springConfig);
+  const rotateY = useSpring(useTransform(mouseX, [-300, 300], [-8, 8]), springConfig);
+
+  useEffect(() => {
+    mockMessages.forEach((msg, i) => {
+      setTimeout(() => {
+        setVisibleMessages((prev) => [...prev, msg.id]);
+      }, 800 + i * 900);
+    });
+  }, []);
+
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    mouseX.set(e.clientX - centerX);
+    mouseY.set(e.clientY - centerY);
+  };
+
+  const handleMouseLeave = () => {
+    mouseX.set(0);
+    mouseY.set(0);
+  };
+
+  return (
+    <div 
+      className="relative w-full max-w-[360px] mx-auto perspective-[1200px]"
+      style={{ height: 600 }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      <motion.div
+        style={{
+          rotateX,
+          rotateY,
+          transformStyle: "preserve-3d",
+        }}
+        className="w-full h-full"
+      >
+        <div
+          className={`absolute inset-0 rounded-[48px] overflow-hidden shadow-2xl transition-colors duration-500 border ${
+            dark 
+              ? 'bg-[#111118] border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]' 
+              : 'bg-white border-black/5 shadow-[0_20px_50px_rgba(0,0,0,0.1)]'
+          }`}
+        >
+          {/* Mockup Header */}
+          <div
+            className={`flex items-center gap-3 px-5 pt-12 pb-4 border-b backdrop-blur-md ${
+              dark ? 'border-white/10 bg-white/5' : 'border-black/5 bg-black/5'
+            }`}
+            style={{ transform: "translateZ(30px)" }} // Pop out effect
+          >
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-sm">A</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold text-[17px] ${dark ? 'text-white' : 'text-slate-900'}`}>Alice</p>
+              <p className="text-[12px] text-emerald-500 font-medium">● Online</p>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex flex-col gap-3 px-4 py-6 overflow-hidden h-[400px]">
+            <AnimatePresence>
+              {mockMessages.map((msg) =>
+                visibleMessages.includes(msg.id) ? (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={transitionSnap}
+                    style={{ transform: "translateZ(20px)" }}
+                    className={`flex flex-col ${msg.sent ? "items-end" : "items-start"}`}
+                  >
+                    <div
+                      className={`px-4 py-2.5 max-w-[80%] text-[15px] leading-relaxed shadow-sm ${
+                        msg.sent 
+                          ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl rounded-tr-sm" 
+                          : dark 
+                            ? "bg-[#1f1f2e] text-slate-200 rounded-2xl rounded-tl-sm border border-white/5" 
+                            : "bg-slate-100 text-slate-800 rounded-2xl rounded-tl-sm border border-black/5"
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1 px-1 flex items-center gap-1">
+                      {msg.time}
+                      {msg.sent && <CheckCheck size={12} className="text-indigo-500" />}
+                    </div>
+                  </motion.div>
+                ) : null
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Input Bar */}
+          <div
+            className={`absolute bottom-0 left-0 right-0 p-4 border-t backdrop-blur-md ${
+              dark ? 'border-white/10 bg-white/5' : 'border-black/5 bg-black/5'
+            }`}
+            style={{ transform: "translateZ(40px)" }}
+          >
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-full border ${
+              dark ? 'bg-black/20 border-white/10' : 'bg-white border-black/10 shadow-sm'
+            }`}>
+              <CirclePlus size={20} className="text-slate-400" />
+              <div className={`flex-1 text-[15px] ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Message Alice...
+              </div>
+              <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center shadow-md">
+                <ArrowRight size={14} className="text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* Glare effect */}
+          <div 
+            className="absolute inset-0 pointer-events-none rounded-[48px] bg-gradient-to-tr from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700" 
+            style={{ transform: "translateZ(50px)" }}
+          />
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function FeatureCard({ icon: Icon, title, description, color, index, dark }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ ...springDefault, delay: index * 0.07 }}
-      whileTap={{ scale: 0.97 }}
-      className="glass-thick rounded-2xl p-5 flex flex-col gap-3"
-      style={{ cursor: "default" }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ type: "spring", bounce: 0, duration: 0.5, delay: index * 0.05 }}
+      className="relative group rounded-3xl p-6 transition-all duration-300 border border-border bg-card shadow-lg md:hover:shadow-xl md:hover:-translate-y-1 md:hover:scale-[1.02]"
     >
       <div
-        className="w-11 h-11 rounded-2xl flex items-center justify-center"
-        style={{ background: `${color}18` }}
+        className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-inner"
+        style={{ 
+          background: dark ? `rgba(255,255,255,0.05)` : `${color}15`,
+          border: `1px solid ${dark ? 'rgba(255,255,255,0.1)' : `${color}30`}`
+        }}
       >
-        <Icon size={22} strokeWidth={1.75} color={color} />
+        <Icon size={24} color={color} />
       </div>
-      <div>
-        <p style={{ fontSize: 17, fontWeight: 600, lineHeight: "22px", color: "var(--foreground)", marginBottom: 4 }}>
-          {title}
-        </p>
-        <p style={{ fontSize: 15, lineHeight: "20px", color: "var(--label-secondary)" }}>{description}</p>
-      </div>
+      <h3 className="text-xl font-semibold mb-2 text-card-foreground">
+        {title}
+      </h3>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        {description}
+      </p>
+      
+      {/* Subtle bottom glow on hover */}
+      <div 
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-1 bg-gradient-to-r from-transparent via-current to-transparent opacity-0 group-hover:opacity-100 blur-sm transition-opacity duration-500"
+        style={{ color: color }}
+      />
     </motion.div>
   );
 }
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState(false);
+  // We manage the toggle state and sync it with document.documentElement.classList
+  const [dark, setDark] = useState(() => {
+    return document.documentElement.classList.contains('dark') || 
+           window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
   const [scrolled, setScrolled] = useState(false);
-  const heroRef = useRef(null);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    setDark(mq.matches);
-    const handler = (e) => setDark(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const handleScroll = (e) => setScrolled(e.currentTarget.scrollTop > 20);
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* ── Nav ── */}
-      <motion.nav
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4"
-        animate={{
-          backdropFilter: scrolled ? "blur(20px) saturate(180%)" : "blur(0px)",
-          background: scrolled ? (dark ? "rgba(28,28,30,0.72)" : "rgba(255,255,255,0.72)") : "rgba(0,0,0,0)",
-          borderBottomColor: scrolled ? (dark ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.6)") : "rgba(0,0,0,0)",
-        }}
-        transition={{ duration: 0.2 }}
-        style={{ background: "rgba(0,0,0,0)", borderBottom: "1px solid rgba(0,0,0,0)" }}
-      >
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full ring-1 ring-border/50">
-            <img src="/logo-light.png" alt="Cipher" className="h-full w-full object-cover dark:hidden" />
-            <img src="/logo-dark.png" alt="Cipher" className="hidden h-full w-full object-cover dark:block" />
+    <div 
+      onScroll={handleScroll}
+      className="relative h-[100dvh] w-full overflow-y-auto overflow-x-hidden scroll-smooth font-sans transition-colors duration-200 bg-background text-foreground"
+    >
+      <MeshBackground dark={dark} />
+
+      {/* ── Floating Navbar ── */}
+      <div className="fixed top-0 left-0 right-0 z-50 flex justify-center mt-4 px-4 transition-transform duration-300" style={{ transform: scrolled ? 'translateY(0)' : 'translateY(4px)' }}>
+        <motion.nav
+          className={`flex items-center justify-between px-4 py-2 w-full max-w-4xl rounded-full border shadow-lg backdrop-blur-xl transition-all duration-300 ${
+            dark 
+              ? 'bg-black/40 border-white/10 shadow-black/50' 
+              : 'bg-white/70 border-black/5 shadow-slate-200/50'
+          }`}
+        >
+          <div className="flex items-center gap-3 pl-2">
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full ring-2 ring-indigo-500/50 shadow-inner">
+              <img src="/logo-light.png" alt="Cipher" className="h-full w-full object-cover dark:hidden" />
+              <img src="/logo-dark.png" alt="Cipher" className="hidden h-full w-full object-cover dark:block" />
+            </div>
+            <span className="font-bold text-[17px] tracking-tight">Cipher</span>
           </div>
-          <span style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)" }}>Cipher</span>
-        </div>
 
-        <div className="hidden md:flex items-center gap-8">
-          {["Features", "Security", "Download"].map((item) => (
-            <a
-              key={item}
-              href="#"
-              style={{ fontSize: 15, color: "var(--label-secondary)", textDecoration: "none" }}
-              onMouseEnter={(e) => (e.target.style.color = "#007AFF")}
-              onMouseLeave={(e) => (e.target.style.color = "var(--label-secondary)")}
-            >
-              {item}
-            </a>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setDark(!dark)}
-            className="w-11 h-11 rounded-full flex items-center justify-center"
-            style={{ background: "var(--secondary)", color: "var(--label-secondary)" }}
-          >
-            {dark ? <Sun size={18} strokeWidth={1.75} /> : <Moon size={18} strokeWidth={1.75} />}
-          </button>
-          <button
-            onClick={() => navigate("/signup")}
-            className="hidden md:flex items-center gap-2 px-5 h-11 rounded-2xl"
-            style={{ background: "#007AFF", color: "#fff", fontWeight: 590, fontSize: 15 }}
-          >
-            Get Started
-            <ChevronRight size={14} strokeWidth={2} />
-          </button>
-        </div>
-      </motion.nav>
-
-      {/* ── Hero ── */}
-      <section ref={heroRef} className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-16 overflow-hidden">
-        {/* Ambient orbs */}
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            width: 600,
-            height: 600,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(0,122,255,0.18) 0%, transparent 70%)",
-            top: "-10%",
-            left: "60%",
-            transform: "translateX(-50%)",
-            filter: "blur(60px)",
-          }}
-        />
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            width: 500,
-            height: 500,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(52,199,89,0.12) 0%, transparent 70%)",
-            bottom: "5%",
-            left: "10%",
-            filter: "blur(80px)",
-          }}
-        />
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            width: 400,
-            height: 400,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(191,90,242,0.10) 0%, transparent 70%)",
-            top: "30%",
-            right: "-5%",
-            filter: "blur(70px)",
-          }}
-        />
-
-        <div className="relative z-10 max-w-6xl w-full mx-auto grid lg:grid-cols-2 gap-16 items-center">
-          {/* Left copy */}
-          <div className="flex flex-col gap-6">
-            {/* Badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springDefault, delay: 0.1 }}
-            >
-              <span
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full"
-                style={{
-                  background: "rgba(0,122,255,0.1)",
-                  color: "#007AFF",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  border: "1px solid rgba(0,122,255,0.2)",
-                }}
+          <div className="hidden md:flex items-center gap-8 font-medium text-[14px]">
+            {["Features", "Security"].map((item) => (
+              <a
+                key={item}
+                href={`#${item.toLowerCase()}`}
+                className={`transition-colors duration-200 ${dark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-primary'}`}
               >
-                <Lock size={12} strokeWidth={2} />
-                End-to-End Encrypted by Default
-              </span>
+                {item}
+              </a>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDark(!dark)}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                dark ? 'bg-white/10 hover:bg-white/20 text-yellow-400' : 'bg-secondary md:hover:bg-secondary/80 text-primary'
+              }`}
+              aria-label="Toggle dark mode"
+            >
+              <motion.div
+                initial={false}
+                animate={{ rotate: dark ? 0 : 180 }}
+                transition={{ duration: 0.5, type: "spring" }}
+              >
+                {dark ? <Sun size={18} strokeWidth={2} /> : <Moon size={18} strokeWidth={2} />}
+              </motion.div>
+            </button>
+            <button
+              onClick={() => navigate("/login")}
+              className="hidden md:flex items-center gap-2 px-5 h-10 rounded-full font-semibold text-[14px] transition-[transform,opacity] duration-150 ease-out active:scale-[0.97] shadow-md bg-foreground text-background hover:opacity-90"
+            >
+              Sign In
+            </button>
+          </div>
+        </motion.nav>
+      </div>
+
+      {/* ── Hero Section ── */}
+      <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-32 pb-20">
+        <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+          
+          {/* Left: Copy */}
+          <div className="flex flex-col items-start gap-8 z-10">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold border bg-primary/10 text-primary border-primary/20"
+            >
+              <Sparkles size={14} />
+              <span>Cipher v2.0 is now live</span>
             </motion.div>
 
             <motion.h1
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springDefault, delay: 0.18 }}
-              style={{
-                fontSize: "clamp(40px, 6vw, 64px)",
-                fontWeight: 700,
-                lineHeight: 1.08,
-                letterSpacing: "-0.02em",
-                color: "var(--foreground)",
-              }}
+              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1], delay: 0.1 }}
+              className="text-[clamp(44px,6vw,72px)] font-extrabold leading-[1.05] tracking-tight"
             >
-              Messages that stay{" "}
-              <span style={{ color: "#007AFF" }}>between you</span>
+              Secure messaging that feels <br className="hidden lg:block" />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/60 animate-gradient-x">
+                truly alive.
+              </span>
             </motion.h1>
 
             <motion.p
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springDefault, delay: 0.26 }}
-              style={{ fontSize: 17, lineHeight: "28px", color: "var(--label-secondary)", maxWidth: 480 }}
+              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1], delay: 0.15 }}
+              className={`text-[clamp(16px,2vw,20px)] leading-relaxed max-w-lg ${
+                dark ? 'text-slate-400' : 'text-slate-600'
+              }`}
             >
-              Cipher is a real-time chat app built around one principle: your conversations are yours.
-              With true end-to-end encryption, zero telemetry, and a beautiful interface,
-              talking to the people you care about has never felt this private.
+              Experience the perfect harmony of uncompromising end-to-end encryption and a stunning, fluid interface. Privacy doesn't have to be boring.
             </motion.p>
 
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springDefault, delay: 0.34 }}
-              className="flex flex-wrap gap-3"
+              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1], delay: 0.2 }}
+              className="flex flex-wrap items-center gap-4 mt-2"
             >
               <button
                 onClick={() => navigate("/signup")}
-                className="flex items-center gap-2 px-7 rounded-2xl transition-[transform,background-color] duration-[160ms] ease-[var(--ease-out)] active:scale-[0.97]"
-                style={{
-                  background: "#007AFF",
-                  color: "#fff",
-                  fontWeight: 590,
-                  fontSize: 17,
-                  height: 50,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#0062CC")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "#007AFF")}
+                className="group relative flex items-center gap-3 px-8 h-14 rounded-full bg-primary text-primary-foreground font-semibold text-[16px] shadow-[0_0_40px_rgba(0,122,255,0.4)] transition-transform duration-150 ease-out active:scale-[0.97] overflow-hidden"
               >
-                Download for Free
-                <ArrowUp size={16} strokeWidth={2.5} style={{ transform: "rotate(45deg)" }} />
+                <div className="absolute inset-0 bg-white/20 translate-y-full md:group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+                <span className="relative z-10">Start Chatting Free</span>
+                <ArrowRight size={18} className="relative z-10 md:group-hover:translate-x-1 transition-transform" />
               </button>
               <button
-                className="flex items-center gap-2 px-7 rounded-2xl transition-[transform,background-color] duration-[160ms] ease-[var(--ease-out)] active:scale-[0.97]"
-                style={{
-                  background: "var(--secondary)",
-                  color: "var(--foreground)",
-                  fontWeight: 590,
-                  fontSize: 17,
-                  height: 50,
-                  border: "none",
-                  cursor: "pointer",
-                }}
+                className="flex items-center gap-2 px-8 h-14 rounded-full font-semibold text-[16px] transition-transform duration-150 ease-out active:scale-[0.97] border border-border bg-card text-card-foreground shadow-sm hover:bg-secondary"
               >
-                See How It Works
+                Read the Docs
               </button>
             </motion.div>
-
-            {/* Trust indicators */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ ...springDefault, delay: 0.44 }}
-              className="flex flex-wrap gap-6 pt-2"
-            >
-              {[
-                { label: "100%", sub: "Open Source" },
-                { label: "256-bit", sub: "AES-GCM" },
-                { label: "0", sub: "Data sold" },
-              ].map((stat) => (
-                <div key={stat.label} className="flex flex-col">
-                  <span style={{ fontSize: 22, fontWeight: 700, color: "var(--foreground)" }}>{stat.label}</span>
-                  <span style={{ fontSize: 13, color: "var(--label-secondary)" }}>{stat.sub}</span>
-                </div>
-              ))}
-            </motion.div>
           </div>
 
-          {/* Right — phone mockup */}
+          {/* Right: 3D Mockup */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ ...springDefault, delay: 0.3 }}
-            className="flex justify-center"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 1, delay: 0.4, type: "spring" }}
+            className="w-full flex justify-center lg:justify-end z-10"
           >
-            <ChatPreview />
+            <HeroMockup dark={dark} />
           </motion.div>
         </div>
       </section>
 
-      {/* ── Features ── */}
-      <section className="relative px-6 py-24 overflow-hidden">
-        <div className="max-w-5xl mx-auto">
+      {/* ── Features Grid ── */}
+      <section id="features" className="relative px-6 py-32 z-10">
+        <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={springDefault}
-            className="text-center mb-14"
+            transition={{ duration: 0.7 }}
+            className="text-center mb-20"
           >
-            <p style={{ fontSize: 13, fontWeight: 600, color: "#007AFF", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
-              Everything you need
-            </p>
-            <h2 style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, lineHeight: 1.15, letterSpacing: "-0.01em", color: "var(--foreground)" }}>
-              Built for privacy. Designed for people.
+            <h2 className="text-[clamp(32px,4vw,48px)] font-bold tracking-tight mb-6">
+              Engineered for Privacy.<br/>Designed for Humans.
             </h2>
-            <p style={{ fontSize: 17, color: "var(--label-secondary)", marginTop: 12, maxWidth: 500, margin: "12px auto 0" }}>
-              Every feature was chosen because it makes communication better — not because it helps us collect data.
+            <p className={`text-lg max-w-2xl mx-auto ${dark ? 'text-slate-400' : 'text-slate-600'}`}>
+              We rebuilt secure messaging from the ground up to prove that robust encryption can coexist with a beautiful, modern user experience.
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, i) => (
-              <FeatureCard key={feature.title} {...feature} index={i} />
+              <FeatureCard key={feature.title} {...feature} index={i} dark={dark} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── How It Works ── */}
-      <section className="px-6 py-24">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={springDefault}
-            className="text-center mb-16"
-          >
-            <p style={{ fontSize: 13, fontWeight: 600, color: "#007AFF", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
-              How it works
-            </p>
-            <h2 style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, lineHeight: 1.15, letterSpacing: "-0.01em", color: "var(--foreground)" }}>
-              Secure by design
-            </h2>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                step: "01",
-                title: "Keys on your device",
-                description: "When you sign up, your encryption keys are generated locally. They never leave your device — not during sign-up, not ever.",
-                color: "#007AFF",
-              },
-              {
-                step: "02",
-                title: "Messages encrypted before sending",
-                description: "Every message is encrypted using AES-256-GCM with your recipient's public key before it reaches our servers.",
-                color: "#34C759",
-              },
-              {
-                step: "03",
-                title: "Only the recipient can read it",
-                description: "Our servers relay ciphertext. We literally cannot read your messages — even if compelled to, there's nothing to hand over.",
-                color: "#BF5AF2",
-              },
-            ].map((item, i) => (
-              <motion.div
-                key={item.step}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ ...springDefault, delay: i * 0.1 }}
-                className="relative glass-thick rounded-2xl p-6"
-              >
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: item.color,
-                    letterSpacing: "0.06em",
-                    display: "block",
-                    marginBottom: 16,
-                  }}
-                >
-                  {item.step}
-                </span>
-                <p style={{ fontSize: 20, fontWeight: 600, lineHeight: "25px", color: "var(--foreground)", marginBottom: 8 }}>
-                  {item.title}
-                </p>
-                <p style={{ fontSize: 15, lineHeight: "20px", color: "var(--label-secondary)" }}>
-                  {item.description}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Sidebar Preview ── */}
-      <section className="px-6 py-20">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Sidebar mockup */}
-            <motion.div
-              initial={{ opacity: 0, x: -24 }}
-              whileInView={{ opacity: 1, x: 0 }}
+      {/* ── Deep Dive / Bento Grid Section ── */}
+      <section id="security" className="px-6 py-20 pb-40 z-10">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Big Bento Box 1 */}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={springDefault}
-              className="order-2 lg:order-1"
+              className="lg:col-span-8 rounded-[32px] p-8 md:p-12 relative overflow-hidden flex flex-col justify-between border border-border bg-card shadow-xl"
             >
-              <div
-                className="rounded-[28px] overflow-hidden shadow-xl max-w-sm mx-auto"
-                style={{
-                  background: "var(--background)",
-                  border: "1px solid var(--border)",
-                  height: 480,
-                }}
-              >
-                {/* Sidebar header */}
-                <div className="px-4 pt-12 pb-2">
-                  <div className="flex items-center justify-between mb-4">
-                    <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--foreground)" }}>
-                      Messages
-                    </span>
-                    <button style={{ color: "#007AFF" }}>
-                      <SquarePen size={22} strokeWidth={1.75} />
-                    </button>
-                  </div>
-                  {/* Search pill */}
-                  <div
-                    className="flex items-center gap-2 px-4"
-                    style={{
-                      background: "var(--secondary)",
-                      borderRadius: 999,
-                      height: 36,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <Search size={14} strokeWidth={1.75} color="var(--muted-foreground)" />
-                    <span style={{ fontSize: 15, color: "var(--muted-foreground)" }}>Search</span>
-                  </div>
-                </div>
-
-                {/* Conversation rows */}
-                {[
-                  { name: "Alice", preview: "Ship it!", time: "Now", unread: 0, color: "from-blue-400 to-purple-500", online: true },
-                  { name: "Design Team", preview: "Emily: Uploaded assets 🎨", time: "Yest.", unread: 3, color: "from-orange-400 to-pink-500", online: false },
-                  { name: "Bob", preview: "Sounds good to me!", time: "Mon", unread: 0, color: "from-green-400 to-teal-500", online: false },
-                  { name: "Family", preview: "Dad: See you Sunday!", time: "Sun", unread: 1, color: "from-yellow-400 to-orange-500", online: false },
-                ].map((conv, i) => (
-                  <div key={conv.name}>
-                    <div
-                      className="flex items-center gap-3 px-4"
-                      style={{ height: 76, cursor: "pointer" }}
-                    >
-                      <div className="relative flex-shrink-0">
-                        <div className={`w-[50px] h-[50px] rounded-full bg-gradient-to-br ${conv.color} flex items-center justify-center`}>
-                          <span style={{ color: "#fff", fontSize: 17, fontWeight: 600 }}>{conv.name[0]}</span>
-                        </div>
-                        {conv.online && (
-                          <div
-                            className="absolute bottom-0 right-0 w-3 h-3 rounded-full"
-                            style={{ background: "#34C759", border: "2px solid var(--background)" }}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span style={{ fontSize: 17, fontWeight: 600, color: "var(--foreground)" }}>{conv.name}</span>
-                          <span style={{ fontSize: 12, color: "var(--label-tertiary)" }}>{conv.time}</span>
-                        </div>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <span
-                            style={{ fontSize: 15, color: "var(--label-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}
-                          >
-                            {conv.preview}
-                          </span>
-                          {conv.unread > 0 && (
-                            <div
-                              className="flex items-center justify-center rounded-full"
-                              style={{
-                                background: "#007AFF",
-                                color: "#fff",
-                                minWidth: 20,
-                                height: 20,
-                                fontSize: 11,
-                                fontWeight: 500,
-                                padding: "0 6px",
-                              }}
-                            >
-                              {conv.unread}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {i < 3 && (
-                      <div style={{ marginLeft: 66, borderBottom: "0.5px solid var(--border)" }} />
-                    )}
-                  </div>
-                ))}
+              <div className="relative z-10 max-w-md">
+                <h3 className="text-3xl font-bold mb-4">Zero Knowledge Architecture</h3>
+                <p className="text-lg text-muted-foreground">
+                  Our servers act simply as blind relays. We cannot decrypt, read, or analyze your conversations. Your data is mathematically locked to your devices.
+                </p>
+              </div>
+              
+              {/* Decorative graphic */}
+              <div className="absolute right-[-10%] bottom-[-20%] w-[60%] opacity-40 pointer-events-none">
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full fill-primary/20">
+                  <path d="M44.7,-76.4C58.8,-69.2,71.8,-59.1,81.3,-46.3C90.8,-33.5,96.8,-18,97,-2.4C97.1,13.2,91.3,28.8,81.8,41.9C72.3,55,59.1,65.6,44.5,72.7C29.9,79.8,14.9,83.4,-0.4,84.1C-15.8,84.8,-31.5,82.5,-45.3,74.9C-59.2,67.3,-71.1,54.4,-79.8,39.4C-88.5,24.4,-93.9,7.4,-92.3,-9.1C-90.7,-25.6,-82.1,-41.6,-70,-54.2C-57.9,-66.7,-42.3,-75.8,-27.1,-79.9C-11.9,-83.9,2.8,-82.9,17.4,-80.1C31.9,-77.3,44.7,-76.4,44.7,-76.4Z" transform="translate(100 100)" />
+                </svg>
               </div>
             </motion.div>
 
-            {/* Copy */}
-            <motion.div
-              initial={{ opacity: 0, x: 24 }}
-              whileInView={{ opacity: 1, x: 0 }}
+            {/* Small Bento Box 2 */}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={springDefault}
-              className="order-1 lg:order-2 flex flex-col gap-5"
+              transition={{ delay: 0.2 }}
+              className="lg:col-span-4 rounded-[32px] p-8 relative overflow-hidden flex flex-col justify-between border border-border bg-card shadow-xl"
             >
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#007AFF", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                Familiar interface
-              </p>
-              <h2 style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, lineHeight: 1.15, letterSpacing: "-0.01em", color: "var(--foreground)" }}>
-                Feels like home. Works everywhere.
-              </h2>
-              <p style={{ fontSize: 17, lineHeight: "28px", color: "var(--label-secondary)" }}>
-                Cipher's interface follows the same spatial logic as the apps you already love —
-                so you spend less time learning and more time connecting.
-                Available on iOS, Android, and the web.
-              </p>
-              <ul className="flex flex-col gap-3">
-                {[
-                  "Inset hairline dividers for clean list views",
-                  "Large title headers with quick compose access",
-                  "Springy, physics-based transitions",
-                  "Dark mode that respects your system preference",
-                ].map((point) => (
-                  <li key={point} className="flex items-start gap-3">
-                    <div
-                      className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                      style={{ background: "rgba(0,122,255,0.12)" }}
-                    >
-                      <CheckCheck size={11} strokeWidth={2.5} color="#007AFF" />
-                    </div>
-                    <span style={{ fontSize: 15, lineHeight: "20px", color: "var(--label-secondary)" }}>{point}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="w-12 h-12 rounded-full bg-pink-500/20 text-pink-500 flex items-center justify-center mb-8">
+                <Moon size={24} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold mb-3">Flawless Dark Mode</h3>
+                <p className="text-muted-foreground">
+                  Hand-tuned colors for both light and dark environments. 
+                </p>
+              </div>
             </motion.div>
+
           </div>
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section className="px-6 py-24">
-        <div className="max-w-3xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
-            whileInView={{ opacity: 1, scale: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={springDefault}
-            className="relative overflow-hidden rounded-[28px] px-8 py-14 text-center"
-            style={{ background: "#007AFF" }}
-          >
-            {/* Inner ambient orbs */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                width: 300,
-                height: 300,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.12)",
-                top: "-30%",
-                right: "-10%",
-                filter: "blur(40px)",
-              }}
-            />
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                width: 200,
-                height: 200,
-                borderRadius: "50%",
-                background: "rgba(52,199,89,0.2)",
-                bottom: "-20%",
-                left: "5%",
-                filter: "blur(40px)",
-              }}
-            />
-
-            <div className="relative z-10 flex flex-col items-center gap-6">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.2)" }}
-              >
-                <Lock size={24} strokeWidth={2} color="#fff" />
-              </div>
-              <h2 style={{ fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 700, lineHeight: 1.12, color: "#fff", letterSpacing: "-0.01em" }}>
-                Start messaging privately today
-              </h2>
-              <p style={{ fontSize: 17, lineHeight: "28px", color: "rgba(255,255,255,0.8)", maxWidth: 440 }}>
-                Join the privacy-first messaging platform. Free forever, no credit card required.
-              </p>
-              <div className="flex flex-wrap gap-3 justify-center">
-                <button
-                  onClick={() => navigate("/signup")}
-                  className="flex items-center gap-2 px-7 rounded-2xl"
-                  style={{
-                    background: "#fff",
-                    color: "#007AFF",
-                    fontWeight: 590,
-                    fontSize: 17,
-                    height: 50,
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  Create Free Account
-                  <ChevronRight size={16} strokeWidth={2} />
-                </button>
-                <button
-                  className="flex items-center gap-2 px-7 rounded-2xl"
-                  style={{
-                    background: "rgba(255,255,255,0.18)",
-                    color: "#fff",
-                    fontWeight: 590,
-                    fontSize: 17,
-                    height: 50,
-                    border: "1px solid rgba(255,255,255,0.3)",
-                    cursor: "pointer",
-                  }}
-                >
-                  View on GitHub
-                </button>
-              </div>
-            </div>
-          </motion.div>
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer className="hairline px-6 py-10">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ring-1 ring-border/50">
+      <footer className={`relative border-t py-12 px-6 z-10 ${dark ? 'border-white/10 bg-[#030712]/50' : 'border-black/5 bg-[#f8fafc]/50'} backdrop-blur-xl`}>
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full ring-2 ring-indigo-500/50">
               <img src="/logo-light.png" alt="Cipher" className="h-full w-full object-cover dark:hidden" />
               <img src="/logo-dark.png" alt="Cipher" className="hidden h-full w-full object-cover dark:block" />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--foreground)" }}>Cipher</span>
+            <span className="font-bold text-lg">Cipher</span>
           </div>
-          <p style={{ fontSize: 13, color: "var(--label-tertiary)", textAlign: "center" }}>
-            © 2026 Cipher. Your messages are yours. Always.
+          
+          <p className={`text-sm ${dark ? 'text-slate-500' : 'text-slate-500'}`}>
+            © {new Date().getFullYear()} Cipher. Privacy is a human right.
           </p>
-          <div className="flex items-center gap-5">
-            {["Privacy", "Terms", "Security"].map((link) => (
-              <a
-                key={link}
-                href="#"
-                style={{ fontSize: 13, color: "var(--label-secondary)", textDecoration: "none" }}
-              >
-                {link}
-              </a>
-            ))}
+          
+          <div className="flex gap-6 text-sm font-medium">
+            <a href="#" className={`hover:text-indigo-500 transition-colors ${dark ? 'text-slate-400' : 'text-slate-600'}`}>Twitter</a>
+            <a href="#" className={`hover:text-indigo-500 transition-colors ${dark ? 'text-slate-400' : 'text-slate-600'}`}>GitHub</a>
+            <a href="#" className={`hover:text-indigo-500 transition-colors ${dark ? 'text-slate-400' : 'text-slate-600'}`}>Discord</a>
           </div>
         </div>
       </footer>

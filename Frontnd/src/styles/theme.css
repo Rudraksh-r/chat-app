@@ -189,6 +189,7 @@
 
   html, body {
     @apply bg-background text-foreground;
+    scroll-behavior: smooth;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
       "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
